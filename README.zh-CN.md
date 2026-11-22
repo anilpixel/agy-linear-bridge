@@ -1,0 +1,163 @@
+# agy-linear-bridge
+
+[English](README.md) | 简体中文
+
+将 Linear 原生 **Agent Sessions**（`actor=app` 的 `@提及` 或工单指派）桥接到云端隔离的 **Antigravity Remote Agents**（`agy --remote-agent`）。
+
+> [!NOTE]
+> **非官方社区集成说明**：本项目基于 Linear `AgentSessionEvent` Webhook / GraphQL API 与 `agy` CLI（已于 `agy 1.5.14`、Node.js `v24.22.1`、Python `3.13.11` 验证）构建。由于当前借助 PTY 自动化与 TUI 状态解析驱动远端会话，后续若上游 `agy` 更新交互输出文案，可能需要同步调整匹配规则。
+
+---
+
+## 架构概览
+
+```mermaid
+flowchart LR
+  Linear["Linear Workspace (actor=app)"] -->|"AgentSessionEvent Webhook"| Bridge["agy-linear-bridge (Node.js HTTP Server)"]
+  Bridge -->|"规则匹配 + 无状态 Flash 路由"| Launcher["PTY 发射器 (scripts/launch_remote_agent.py)"]
+  Bridge -.->|"本地目录或 gh api 拉取"| Workflow["仓库 WORKFLOW.md 策略"]
+  Launcher -->|"拉起隔离云端会话"| Agy["Antigravity Cloud uVM (agy --remote-agent)"]
+  Agy -->|"HTTPS Callback (thought / action / response / prUrl)"| Bridge
+  Watcher["只读 PTY 流式监听器"] -.->|"实时进度、工具动作与 PR 链接同步"| Bridge
+  Bridge -->|"AgentActivity 与 externalUrls"| Linear
+  GitHub["GitHub 仓库 Webhook"] -->|"PR 同步 / CI 失败 / Review 评论"| Bridge
+  Bridge -->|"--conversation 续接修复"| Launcher
+```
+
+---
+
+## 核心特性
+
+- **零外部 npm 依赖**：仅使用 Node.js `>= 22` 内置模块与 Python 3 标准库。
+- **零本地 Git worktree 维护**：任务直接在 Antigravity 云端 ACE uVM 中执行，无需在本地维护多仓库 clone 与清理 worktree。
+- **符合 Linear Agent 原生协议**：通过 `actor=app` OAuth 授权安装，自动满足 5 秒 Webhook ACK、10 秒内首发 `thought` 与活跃会话生命周期管理。
+- **混合多项目路由**：先按确定性规则（`projectId` → `projectSlug` → `projectName` → `labels` → 唯一 `teamKey`）匹配 `config/projects.json`，未命中时可选用无状态 `agy -p` Flash 兜底路由或发 `elicitation` 向人工澄清。
+- **对齐 Linear 分支与 Prompt 规范**：自动查询 `issue.branchName`、`priorityLabel`、`parent`、`guidance` 并合并 `promptContext`（避免描述重复注入），确保创建的分支与 PR 自动关联 Linear 工单与状态流转。
+- **Per-repo `WORKFLOW.md`（借鉴 Symphony）**：派单前自动从本地路径或 `gh api` 读取仓库根目录 `WORKFLOW.md`（带 TTL 缓存），注入规范正文并支持用 YAML Frontmatter 覆盖 `mode`、`ciAutoFix`、`reviewAutoResume` 与 `maxCiFixRounds`。
+- **双向实时反馈与原生态停止**：签名 Callback 协议结合只读 PTY 旁路监听（`watch_remote_agent.py`），支持响应 Linear `stop` 信号立即停监听、锁定后续写回（`409`）并尝试向云端发送 `Esc` 取消（`cancel_remote_agent.py`）。
+- **PR 自动挂链与 GitHub CI/Review 闭环（`POST /webhooks/github`）**：自动提取 PR URL 写入 Linear `externalUrls`；配置 GitHub Webhook 后，可在 CI 失败或收到非 Bot Review 时自动 `--conversation` 唤醒原云端会话继续修改（含 SHA 去重与轮次熔断）。
+
+---
+
+## 快速上手
+
+### 前置依赖
+
+- **Node.js `>= 22.0.0`**
+- **Python `>= 3.10`**
+- **`agy` CLI**（确保本地已完成登录且 `agy --remote-agent` 可正常使用）
+- **GitHub CLI（`gh`）**（可选，用于从私有 GitHub 仓库自动读取 `WORKFLOW.md`）
+- **`cloudflared`**（或其他能将本地 `127.0.0.1:8787` 暴露为公网 HTTPS 的隧道工具）
+
+### 1. 配置项目路由映射
+
+复制示例配置文件并填入你的 Linear 项目信息与 Antigravity Remote Project 名称或 UUID：
+
+```bash
+cp config/projects.example.json config/projects.json
+```
+
+在终端启动交互式 `agy --remote-agent` 并执行 `/projects`，即可查看已连接的云端项目列表与 UUID（也可用 `scripts/provision_remote_projects.py` 批量从 GitHub 仓库创建 Remote Project）。
+
+> **提示**：可在 `agy --remote-agent` 内运行 `/config` 检查远端代理的权限预设与计划审批策略，避免长任务无人值守时卡在审批提示。
+
+### 2. 启动公网 HTTPS 隧道
+
+- **方式 A：Quick Tunnel（零域名，最快联调）**：
+  ```bash
+  cloudflared tunnel --no-autoupdate --config /dev/null --url http://127.0.0.1:8787
+  ```
+- **方式 B：固定自定义域名（适合长期运行，脚本仅写当前目录 `./cloudflared.yml`，不修改 `~/.cloudflared/config.yml`）**：
+  ```bash
+  bash scripts/setup-tunnel.sh bridge.example.com
+  cloudflared tunnel --config ./cloudflared.yml run
+  ```
+
+### 3. 启动桥接服务并安装 Linear App（`actor=app`）
+
+```bash
+npm start
+```
+
+另开终端运行交互式安装向导：
+
+```bash
+npm run setup:linear
+```
+
+向导会把 `PUBLIC_BASE_URL`、`LINEAR_CLIENT_ID`、`LINEAR_CLIENT_SECRET` 与 `LINEAR_WEBHOOK_SECRET` 写入 `.env`（`0600` 权限）。写完后**重启一次 `npm start`**，在浏览器完成 Linear Workspace 授权，脚本会自动校验 `viewer.app === true`。
+
+### 4. 可选：启用 GitHub CI/Review 自动闭环
+
+1. 在 `.env` 中填入 `GITHUB_WEBHOOK_SECRET` 并重启 `npm start`（`GET /health` 中 `githubWebhookConfigured` 将变为 `true`）。
+2. 在 GitHub 仓库或组织 Settings → Webhooks 添加：
+   - **Payload URL**：`https://<your-domain>/webhooks/github`
+   - **Content type**：`application/json`
+   - **Secret**：与 `GITHUB_WEBHOOK_SECRET` 一致
+   - **Events**：勾选 `Pull requests`、`Check runs`、`Workflow runs`、`Pull request reviews`、`Pull request review comments`
+
+---
+
+## 仓库级 `WORKFLOW.md` 示例
+
+在目标仓库根目录放置 `WORKFLOW.md`（也可在 `config/projects.json` 中通过 `workflowPath` 或 `localPath` 指定）：
+
+```markdown
+---
+mode: auto
+ciAutoFix: true
+reviewAutoResume: true
+maxCiFixRounds: 3
+---
+
+# 仓库工作流约定
+
+1. 涉及代码修改时，直接使用 Linear 提供的建议分支名。
+2. 发起 PR 前在本地/云端环境完整运行 `pnpm test` 与 `pnpm typecheck`。
+3. PR 标题必须保留 Linear 工单号。
+```
+
+---
+
+## 环境变量说明
+
+完整模板见 [.env.example](.env.example)：
+
+| 变量名 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `PORT` / `HOST` | `8787` / `127.0.0.1` | 本地 HTTP 监听地址 |
+| `PUBLIC_BASE_URL` | — | 公网 HTTPS 基址，用于 OAuth、Webhook 与云端 Callback |
+| `LINEAR_CLIENT_ID` / `LINEAR_CLIENT_SECRET` / `LINEAR_WEBHOOK_SECRET` | — | Linear OAuth 应用凭据（`actor=app`） |
+| `ROUTER_MODE` | `hybrid` | `hybrid`（确定性规则优先 + 无状态 `agy -p` 兜底）或 `rules` |
+| `ROUTER_MODEL` | `gemini-3.8-flash-low` | 无状态路由兜底模型 |
+| `AGY_REMOTE_MODE` | `accept-edits` | 项目或 `WORKFLOW.md` 未覆盖时的默认执行模式 |
+| `WATCHER_ENABLED` | `true` | 是否启用只读 PTY 实时进度监听器 |
+| `WORKFLOW_FETCH_ENABLED` | `true` | 是否启用 `WORKFLOW.md` 加载与缓存（`WORKFLOW_CACHE_TTL_MS=300000`） |
+| `GITHUB_WEBHOOK_SECRET` | — | `POST /webhooks/github` 的 HMAC-SHA256 签名密钥 |
+| `GITHUB_CI_AUTO_FIX` / `GITHUB_REVIEW_AUTO_RESUME` | `true` | 是否在 CI 失败或 PR Review 时自动唤醒会话 |
+| `GITHUB_MAX_CI_FIX_ROUNDS` | `3` | 单会话连续自动修 CI 的上限次数，超出后转为 Linear `elicitation` |
+| `GITHUB_IGNORED_ACTORS` | — | Review Webhook 需额外忽略的 GitHub 用户名（逗号分隔） |
+
+---
+
+## 常用校验与排障命令
+
+```bash
+# 运行全部单元测试与集成测试
+npm test
+
+# 测试工单路由决策（不会实际拉起云端会话）
+npm run route-test -- --team ENG --project backend-app --title "Fix webhook timeout"
+
+# 校验 Linear actor=app Token 身份
+npm run verify-identity
+
+# 查看运行状态与当前活跃 watcher 数量
+curl http://127.0.0.1:8787/health
+```
+
+---
+
+## 开源协议
+
+[MIT](LICENSE)

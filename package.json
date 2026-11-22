@@ -1,0 +1,27 @@
+{
+  "name": "agy-linear-bridge",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Linear AgentSessionEvent bridge & router for Antigravity Remote Agents",
+  "keywords": [
+    "linear",
+    "agent",
+    "antigravity",
+    "agy",
+    "coding-agent",
+    "webhook",
+    "github"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs serve",
+    "test": "node --test src/__tests__/*.test.mjs",
+    "verify-identity": "node src/cli.mjs verify-identity",
+    "route-test": "node src/cli.mjs route-test",
+    "setup:tunnel": "bash scripts/setup-tunnel.sh",
+    "setup:linear": "bash scripts/setup-linear-agent.sh"
+  }
+}

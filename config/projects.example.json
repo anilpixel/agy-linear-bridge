@@ -1,0 +1,50 @@
+{
+  "defaultRemoteProject": "",
+  "defaultMode": "accept-edits",
+  "projects": [
+    {
+      "key": "backend-app",
+      "name": "Backend App",
+      "description": "Core backend API and worker services (repo acme/backend-app, team ENG)",
+      "githubRepo": "acme/backend-app",
+      "workflowPath": "WORKFLOW.md",
+      "remoteProject": "00000000-0000-0000-0000-000000000001",
+      "linear": {
+        "projectIds": ["11111111-1111-4111-8111-111111111101"],
+        "projectSlugs": ["slug-backend-01"],
+        "projectNames": ["backend-app", "Backend App"],
+        "teamKeys": ["ENG"],
+        "labels": []
+      },
+      "extraInstructions": "Follow repository AGENTS.md conventions and run focused tests before opening a PR."
+    },
+    {
+      "key": "mobile-app",
+      "name": "Mobile App",
+      "description": "iOS and Android client (repo acme/mobile-app)",
+      "githubRepo": "acme/mobile-app",
+      "remoteProject": "00000000-0000-0000-0000-000000000002",
+      "linear": {
+        "projectIds": ["11111111-1111-4111-8111-111111111102"],
+        "projectSlugs": ["slug-mobile-02"],
+        "projectNames": ["Mobile App"],
+        "teamKeys": [],
+        "labels": []
+      }
+    },
+    {
+      "key": "game-client",
+      "name": "Game Client",
+      "description": "Cross-platform interactive client (repo acme/game-client)",
+      "githubRepo": "acme/game-client",
+      "remoteProject": "00000000-0000-0000-0000-000000000003",
+      "linear": {
+        "projectIds": ["11111111-1111-4111-8111-111111111103"],
+        "projectSlugs": ["slug-game-03"],
+        "projectNames": ["Game Client"],
+        "teamKeys": [],
+        "labels": []
+      }
+    }
+  ]
+}

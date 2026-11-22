@@ -1,0 +1,12 @@
+.env
+.env.local
+data/
+logs/
+cloudflared.yml
+cloudflared-*.json
+node_modules/
+config/projects.json
+.DS_Store
+__pycache__/
+*.py[cod]
+
