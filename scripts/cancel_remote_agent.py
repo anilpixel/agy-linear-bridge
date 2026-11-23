@@ -25,16 +25,21 @@ def main() -> int:
     )
     parser.add_argument("--agy-bin", default="agy")
     parser.add_argument("--conversation", required=True)
+    parser.add_argument("--project", default="")
     parser.add_argument("--cwd", default=os.getcwd())
     parser.add_argument("--ready-timeout", type=float, default=25.0)
     parser.add_argument("--cancel-timeout", type=float, default=10.0)
     args = parser.parse_args()
 
+    extra_args = ["--conversation", args.conversation]
+    if args.project:
+        extra_args.extend(["--project", args.project])
+
     try:
         with PtySession(
             agy_bin=args.agy_bin,
             cwd=args.cwd,
-            extra_args=["--conversation", args.conversation],
+            extra_args=extra_args,
             rows=60,
             cols=140,
         ) as sess:

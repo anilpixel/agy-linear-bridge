@@ -193,6 +193,7 @@ def main() -> int:
     )
     parser.add_argument("--agy-bin", default="agy")
     parser.add_argument("--conversation", required=True)
+    parser.add_argument("--project", default="")
     parser.add_argument("--cwd", default=os.getcwd())
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--idle-confirm-seconds", type=float, default=8.0)
@@ -208,11 +209,15 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
 
+    extra_args = ["--conversation", args.conversation]
+    if args.project:
+        extra_args.extend(["--project", args.project])
+
     try:
         with PtySession(
             agy_bin=args.agy_bin,
             cwd=args.cwd,
-            extra_args=["--conversation", args.conversation],
+            extra_args=extra_args,
             rows=60,
             cols=140,
         ) as sess:

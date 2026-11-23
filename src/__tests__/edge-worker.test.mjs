@@ -106,8 +106,14 @@ test("Cloudflare Edge Worker + D1 + Outbound EdgeRunner end-to-end: offline queu
   const linearActivities = [];
   const linearSessionUpdates = [];
 
-  // Mock external Linear GraphQL calls made by the Edge Worker
-  const linearFetchMock = async (url, init) => {
+  // Mock external Linear GraphQL calls made by the Edge Worker.
+  // Enforce `this === undefined` just like Cloudflare Workers `globalThis.fetch` (WebIDL Illegal invocation check).
+  const linearFetchMock = async function strictWorkerdFetch(url, init) {
+    if (this !== undefined && this !== globalThis) {
+      throw new TypeError(
+        "Illegal invocation: function called with incorrect `this` reference."
+      );
+    }
     const u = String(url);
     if (u === "https://api.linear.app/graphql") {
       const { query, variables } = JSON.parse(init.body);

@@ -34,7 +34,7 @@ LOCAL_CONV_RE = re.compile(
 )
 SEND_MSG_RE = re.compile(r"Sending user message to conversation", re.IGNORECASE)
 CLOUD_SUMMARY_RE = re.compile(r"Cloud summaries:", re.IGNORECASE)
-ACE_UVM_RE = re.compile(r"cloudproxy:\s+starting on ACE uVM\s+([0-9a-f]+)", re.IGNORECASE)
+ACE_UVM_RE = re.compile(r"cloudproxy:\s+starting on ACE uVM\s+([A-Za-z0-9_-]+)", re.IGNORECASE)
 CLOUD_FATAL_RE = re.compile(
     r"(RESOURCE_EXHAUSTED[^\n]*|Reached the limit of \d+ running environments[^\n]*|cloudproxy:[^\n]*(?:failed|error)[^\n]*)",
     re.IGNORECASE,
@@ -377,10 +377,11 @@ def main() -> int:
                                 uvm_end_offset = uvm_match.end()
 
                         if uvm_end_offset is not None and cloud_confirmed_at is None:
+                            uvm_elapsed = (time.monotonic() - start_time) - uvm_started_at
                             if (
                                 CLOUD_SUMMARY_RE.search(log_tail, uvm_end_offset)
-                                or (time.monotonic() - start_time) - uvm_started_at >= 5.0
-                            ):
+                                and uvm_elapsed >= 6.0
+                            ) or uvm_elapsed >= 8.0:
                                 cloud_confirmed_at = time.monotonic() - start_time
                                 break
                     else:

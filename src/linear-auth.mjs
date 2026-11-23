@@ -175,7 +175,7 @@ export class LinearTokenManager {
   constructor({ linearConfig, tokenStore, fetchImpl = fetch, nowFn = Date.now }) {
     this.linearConfig = linearConfig;
     this.tokenStore = tokenStore;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = (...args) => fetchImpl(...args);
     this.nowFn = nowFn;
     this._inflightRefresh = null;
   }

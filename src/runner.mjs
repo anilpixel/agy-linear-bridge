@@ -50,7 +50,7 @@ export class EdgeLinearProxy {
     this.edgeBaseUrl = String(edgeBaseUrl || "").replace(/\/+$/, "");
     this.runnerSecret = String(runnerSecret || "").trim();
     this.sessionMirror = sessionMirror;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = (...args) => fetchImpl(...args);
   }
 
   async _postSessionUpdate(agentSessionId, payload) {
@@ -132,7 +132,7 @@ export class EdgeRunner {
     this.pollIntervalMs = Math.max(500, Number(config.edge?.pollIntervalMs || 3_000));
     this.launcher = launcher;
     this.logger = logger;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = (...args) => fetchImpl(...args);
     this.routeIssueFn = routeIssueFn;
     this.workflowLoader = workflowLoader || new WorkflowLoader({ config, logger });
     this.sessionMirror = new RunnerSessionMirror();

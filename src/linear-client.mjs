@@ -96,7 +96,7 @@ const AGENT_SESSION_UPDATE_MUTATION = `
 export class LinearClient {
   constructor({ tokenManager, fetchImpl = fetch, endpoint = LINEAR_GRAPHQL_ENDPOINT }) {
     this.tokenManager = tokenManager;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = (...args) => fetchImpl(...args);
     this.endpoint = endpoint;
   }
 

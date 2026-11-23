@@ -160,7 +160,7 @@ function scheduleBackground(ctx, promise) {
  * Create a Cloudflare Worker handler (allowing dependency overrides in tests).
  */
 export function createEdgeWorkerHandler({
-  fetchImpl = fetch,
+  fetchImpl = (...args) => fetch(...args),
   exchangeCodeFn = exchangeAuthorizationCode,
   nowFn = Date.now,
 } = {}) {
@@ -527,7 +527,6 @@ async function processLinearWebhookOnEdge({
   await safeCreateActivity(linearClient, {
     agentSessionId,
     content: { type: "thought", body: ackBody },
-    ephemeral: runnerStatus.online,
   });
 
   let issueContext = event.issue || {};
