@@ -80,7 +80,7 @@ openssl rand -hex 32
 npm run edge:deploy -- --secrets-file .env
 ```
 
-将部署输出的域名（`https://<name>.<subdomain>.workers.dev` 或通过 `WORKER_CUSTOM_DOMAIN` 绑定的自定义域名）写入 `.env` 的 `PUBLIC_BASE_URL` 与 `EDGE_BASE_URL`，在 Linear OAuth 应用填好回调与 Webhook 地址后访问 `<URL>/oauth/start` 完成一次授权（若本地已有 `data/tokens.json`，也可直接运行 `npm run edge:seed` 无感迁移进 D1）。
+将部署输出的域名（`https://<name>.<subdomain>.workers.dev` 或通过 `WORKER_CUSTOM_DOMAIN` 绑定的自定义域名）写入 `.env` 的 `PUBLIC_BASE_URL` 与 `EDGE_BASE_URL`，在 Linear OAuth 应用填好回调与 Webhook 地址后访问 `<URL>/oauth/start` 完成一次授权（若本地已有 `data/tokens.json`，也可直接运行 `npm run edge:seed` 无感迁移进 D1）。D1 数据表会在首次请求时自动幂等初始化，无需手动执行 SQL 迁移。
 
 随后在本地或任意常驻 Linux 云主机（如 Oracle Cloud 免费 ARM 实例、1C1G VPS，无需公网入站端口或域名）启动纯出站 Runner 即可：
 

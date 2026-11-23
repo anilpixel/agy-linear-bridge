@@ -44,7 +44,7 @@ export class RemoteStreamWatcher {
     };
   }
 
-  start({ agentSessionId, conversationId, issueIdentifier = "" }) {
+  start({ agentSessionId, conversationId, issueIdentifier = "", isResume = false }) {
     const settings = this._watcherSettings();
     if (!settings.enabled || !agentSessionId || !conversationId) {
       return false;
@@ -81,6 +81,9 @@ export class RemoteStreamWatcher {
       "--max-seconds",
       String(settings.maxDurationSec),
     ];
+    if (isResume) {
+      args.push("--resume");
+    }
 
     const child = this.spawnImpl(pythonBin, args, {
       stdio: ["ignore", "pipe", "pipe"],

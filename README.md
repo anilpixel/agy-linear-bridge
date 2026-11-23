@@ -80,7 +80,7 @@ openssl rand -hex 32   # save as RUNNER_SHARED_SECRET in .env
 npm run edge:deploy -- --secrets-file .env
 ```
 
-Copy the deployed Worker URL (`https://<name>.<subdomain>.workers.dev` or custom domain via `WORKER_CUSTOM_DOMAIN`), set `PUBLIC_BASE_URL` and `EDGE_BASE_URL` in `.env`, configure your Linear OAuth App (`Callback: <URL>/oauth/callback`, `Webhook: <URL>/webhooks/linear`) and visit `<URL>/oauth/start` once to authorize `actor=app` into D1 (or migrate an existing local `data/tokens.json` with `npm run edge:seed`).
+Copy the deployed Worker URL (`https://<name>.<subdomain>.workers.dev` or custom domain via `WORKER_CUSTOM_DOMAIN`), set `PUBLIC_BASE_URL` and `EDGE_BASE_URL` in `.env`, configure your Linear OAuth App (`Callback: <URL>/oauth/callback`, `Webhook: <URL>/webhooks/linear`) and visit `<URL>/oauth/start` once to authorize `actor=app` into D1 (or migrate an existing local `data/tokens.json` with `npm run edge:seed`). All D1 tables (`sessions`, `runner_jobs`, `kv_state`, `seen_deliveries`) auto-initialize on the first request with zero manual SQL migration steps.
 
 Then start the outbound-only Runner locally (or on an always-on headless Linux VM such as Oracle Cloud Free Tier — no public IP or inbound ports required):
 

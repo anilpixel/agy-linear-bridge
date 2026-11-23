@@ -252,19 +252,42 @@ test("RemoteStreamWatcher throttles status/actions, deduplicates actions, runs i
     assert.equal(activities.length, 4);
     assert.equal(watcher.activeCount(), 0);
 
-    // stopAll terminates remaining watchers
+    // stopAll terminates remaining watchers (and isResume forwards --resume)
     sessionStore.upsert("sess-3", {
       agyConversationId: "conv-3",
       status: "active",
     });
-    watcher.start({ agentSessionId: "sess-3", conversationId: "conv-3" });
+    watcher.start({ agentSessionId: "sess-3", conversationId: "conv-3", isResume: true });
     assert.equal(watcher.activeCount(), 1);
+    assert.ok(spawned[2].args.includes("--resume"));
     watcher.stopAll();
     assert.equal(watcher.activeCount(), 0);
     assert.deepEqual(spawned[2].child.killedSignals, ["SIGTERM"]);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test("watch_remote_agent.py should_emit_idle holds off during cold-uVM resume wakeup until saw_running=True", () => {
+  const py = [
+    "import importlib.util, json, sys",
+    "spec = importlib.util.spec_from_file_location('w', sys.argv[1])",
+    "mod = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(mod)",
+    "# 1) At t=10s in --resume mode (startup_grace=60s), previous turn footer looks idle -> must NOT emit idle",
+    "e1, s1 = mod.should_emit_idle(is_idle=True, saw_running=False, now=110.0, attached_at=100.0, idle_since=None, idle_confirm_seconds=8.0, startup_grace_seconds=60.0)",
+    "# 2) At t=25s uVM wakes up (saw_running=True) and finishes at t=40s -> starts counting idle_since=140.0",
+    "e2, s2 = mod.should_emit_idle(is_idle=True, saw_running=True, now=140.0, attached_at=100.0, idle_since=None, idle_confirm_seconds=8.0, startup_grace_seconds=60.0)",
+    "# 3) 8.5s later (t=48.5s) -> emits idle cleanly without waiting 60s",
+    "e3, s3 = mod.should_emit_idle(is_idle=True, saw_running=True, now=148.5, attached_at=100.0, idle_since=s2, idle_confirm_seconds=8.0, startup_grace_seconds=60.0)",
+    "print(json.dumps({'e1': e1, 's1': s1, 'e2': e2, 's2': s2, 'e3': e3}))",
+  ].join("\n");
+  const out = JSON.parse(execFileSync("python3", ["-c", py, WATCH_SCRIPT], { encoding: "utf8" }));
+  assert.equal(out.e1, false);
+  assert.equal(out.s1, null);
+  assert.equal(out.e2, false);
+  assert.equal(out.s2, 140.0);
+  assert.equal(out.e3, true);
 });
 
 test("RemoteStreamWatcher extracts PR URLs from actions and finalText, preserving Antigravity Remote and deduplicating updates", async () => {

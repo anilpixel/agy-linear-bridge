@@ -331,6 +331,7 @@ export class EdgeRunner {
           agentSessionId,
           conversationId: convId,
           issueIdentifier,
+          isResume: true,
         });
       }
       return;
@@ -527,6 +528,7 @@ export class EdgeRunner {
         agentSessionId,
         conversationId: convId,
         issueIdentifier: existing.issueIdentifier || "",
+        isResume: true,
       });
     }
   }

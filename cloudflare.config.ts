@@ -42,6 +42,9 @@ export default defineConfig({
       LINEAR_CLIENT_SECRET: bindings.secret(),
       LINEAR_WEBHOOK_SECRET: bindings.secret(),
       RUNNER_SHARED_SECRET: bindings.secret(),
+      ...(process.env.GITHUB_WEBHOOK_SECRET
+        ? { GITHUB_WEBHOOK_SECRET: bindings.secret() }
+        : {}),
     },
   },
 });

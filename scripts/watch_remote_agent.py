@@ -183,6 +183,34 @@ def extract_snapshot(lines: list[str]) -> dict:
     }
 
 
+def should_emit_idle(
+    *,
+    is_idle: bool,
+    saw_running: bool,
+    now: float,
+    attached_at: float,
+    idle_since: float | None,
+    idle_confirm_seconds: float,
+    startup_grace_seconds: float,
+) -> tuple[bool, float | None]:
+    """Determine whether to emit `idle` without misfiring during cold-uVM resume wakeup."""
+    if not is_idle:
+        return False, None
+
+    elapsed_since_attach = now - attached_at
+    if not saw_running and elapsed_since_attach < startup_grace_seconds:
+        return False, None
+
+    next_idle_since = now if idle_since is None else idle_since
+    min_attach_elapsed = 8.0 if saw_running else startup_grace_seconds
+    if (
+        now - next_idle_since >= idle_confirm_seconds
+        and elapsed_since_attach >= min_attach_elapsed
+    ):
+        return True, next_idle_since
+    return False, next_idle_since
+
+
 def _emit(payload: dict) -> None:
     print(json.dumps(payload, ensure_ascii=False), flush=True)
 
@@ -197,8 +225,15 @@ def main() -> int:
     parser.add_argument("--cwd", default=os.getcwd())
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--idle-confirm-seconds", type=float, default=8.0)
+    parser.add_argument("--startup-grace-seconds", type=float, default=None)
+    parser.add_argument("--resume", action="store_true", default=False)
     parser.add_argument("--max-seconds", type=float, default=7200.0)
     args = parser.parse_args()
+    startup_grace_seconds = (
+        args.startup_grace_seconds
+        if args.startup_grace_seconds is not None
+        else (60.0 if args.resume else 8.0)
+    )
 
     stop_requested = False
 
@@ -261,9 +296,16 @@ def main() -> int:
                     )
 
             attached_at = time.monotonic()
+            saw_running = bool(initial["isRunning"])
             last_status = initial["statusText"] if initial["isRunning"] else ""
-            idle_since: float | None = (
-                attached_at if initial["isIdle"] else None
+            _, idle_since = should_emit_idle(
+                is_idle=bool(initial["isIdle"]),
+                saw_running=saw_running,
+                now=attached_at,
+                attached_at=attached_at,
+                idle_since=None,
+                idle_confirm_seconds=args.idle_confirm_seconds,
+                startup_grace_seconds=startup_grace_seconds,
             )
 
             while not stop_requested:
@@ -287,6 +329,8 @@ def main() -> int:
                     return 0
 
                 snap = extract_snapshot(sess.term.lines())
+                if snap["isRunning"]:
+                    saw_running = True
                 for item in snap["actions"]:
                     key = (item["action"], item["parameter"])
                     if key not in seen_actions:
@@ -310,23 +354,24 @@ def main() -> int:
                     )
 
                 now = time.monotonic()
-                if snap["isIdle"]:
-                    if idle_since is None:
-                        idle_since = now
-                    if (
-                        now - idle_since >= args.idle_confirm_seconds
-                        and now - attached_at >= 8.0
-                    ):
-                        _emit(
-                            {
-                                "event": "idle",
-                                "conversationId": args.conversation,
-                                "finalText": snap["finalText"],
-                            }
-                        )
-                        return 0
-                else:
-                    idle_since = None
+                emit_now, idle_since = should_emit_idle(
+                    is_idle=bool(snap["isIdle"]),
+                    saw_running=saw_running,
+                    now=now,
+                    attached_at=attached_at,
+                    idle_since=idle_since,
+                    idle_confirm_seconds=args.idle_confirm_seconds,
+                    startup_grace_seconds=startup_grace_seconds,
+                )
+                if emit_now:
+                    _emit(
+                        {
+                            "event": "idle",
+                            "conversationId": args.conversation,
+                            "finalText": snap["finalText"],
+                        }
+                    )
+                    return 0
     except Exception as exc:
         _emit(
             {

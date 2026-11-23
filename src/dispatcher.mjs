@@ -249,6 +249,7 @@ export class EventDispatcher {
         agentSessionId,
         conversationId: convId,
         issueIdentifier,
+        isResume: true,
       });
     }
   }
@@ -594,6 +595,7 @@ export class EventDispatcher {
             agentSessionId,
             conversationId: convId,
             issueIdentifier: latest.issueIdentifier || "",
+            isResume: true,
           });
         }
         return { handled: true, action: "ci_resumed", agentSessionId };
@@ -682,6 +684,7 @@ export class EventDispatcher {
             agentSessionId,
             conversationId: convId,
             issueIdentifier: latest.issueIdentifier || "",
+            isResume: true,
           });
         }
         return { handled: true, action: "review_resumed", agentSessionId };
