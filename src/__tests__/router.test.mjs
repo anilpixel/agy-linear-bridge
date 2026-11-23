@@ -128,7 +128,7 @@ test("routeIssue falls back to stateless agy LLM router in hybrid mode for dispa
         structured_output: {
           action: "elicit",
           projectKey: null,
-          clarifyingQuestion: "请问这是指 Backend App 还是 Game Client 的报错？",
+          clarifyingQuestion: "Does this error belong to Backend App or Game Client?",
           reason: "Insufficient context",
         },
       }),

@@ -165,7 +165,7 @@ test("EventDispatcher sends elicitation when router returns elicit and error act
       },
       routeIssueFn: async () => ({
         action: "elicit",
-        clarifyingQuestion: "请先确认是哪个项目？",
+        clarifyingQuestion: "Which project should handle this issue?",
       }),
       logger: { warn() {}, error() {} },
     });
@@ -444,7 +444,7 @@ test("EventDispatcher handoff mode keeps session active via thought and callback
       action: "prompted",
       agentSessionId: "ase-handoff-1",
       issue: { id: "iss-101", identifier: "ENG-101" },
-      comment: { body: "补充一个约束" },
+      comment: { body: "Add an extra constraint" },
     });
     assert.equal(resumes.length, 1);
     assert.ok(resumes[0].prompt.includes(expectedToken));
@@ -477,7 +477,7 @@ test("EventDispatcher handoff mode keeps session active via thought and callback
         "Content-Type": "application/json",
         Authorization: `Bearer ${expectedToken}`,
       },
-      body: JSON.stringify({ type: "thought", body: "云端正在运行单测" }),
+      body: JSON.stringify({ type: "thought", body: "Running unit tests in cloud" }),
     });
     assert.equal(thoughtRes.status, 200);
     assert.equal(sessionStore.get("ase-handoff-1").status, "active");
@@ -488,7 +488,7 @@ test("EventDispatcher handoff mode keeps session active via thought and callback
         "Content-Type": "application/json",
         Authorization: `Bearer ${expectedToken}`,
       },
-      body: JSON.stringify({ type: "elicitation", body: "需要确认迁移策略？" }),
+      body: JSON.stringify({ type: "elicitation", body: "Please confirm migration strategy?" }),
     });
     assert.equal(elicitRes.status, 200);
     assert.equal(sessionStore.get("ase-handoff-1").status, "awaiting_clarification");
@@ -501,7 +501,7 @@ test("EventDispatcher handoff mode keeps session active via thought and callback
       },
       body: JSON.stringify({
         type: "response",
-        body: "已完成修复并提交 PR #42",
+        body: "Completed fix and opened PR #42",
         plan: { steps: [{ content: "Fix & test", status: "completed" }] },
       }),
     });
@@ -520,9 +520,9 @@ test("EventDispatcher handoff mode keeps session active via thought and callback
 test("buildDispatchPrompt adopts Linear native prompt structure, deduplicates XML & comments, and formats guidance", () => {
   const issueContext = {
     identifier: "ENG-101",
-    title: "优化 outbound-sync 批量写入并发度",
+    title: "Optimize outbound-sync batch write concurrency",
     url: "https://linear.app/acme-workspace/issue/ENG-101",
-    branchName: "antigravity/eng-101-优化-outbound-sync",
+    branchName: "antigravity/eng-101-optimize-outbound-sync",
     priorityLabel: "High",
     description: "UNIQUE_ISSUE_BODY_SHOULD_NOT_REPEAT",
     state: { name: "Todo", type: "unstarted" },
@@ -534,7 +534,7 @@ test("buildDispatchPrompt adopts Linear native prompt structure, deduplicates XM
 
   const promptContextWithComment = [
     '<issue identifier="ENG-101">',
-    "<title>优化 outbound-sync 批量写入并发度</title>",
+    "<title>Optimize outbound-sync batch write concurrency</title>",
     "<description>",
     "UNIQUE_ISSUE_BODY_SHOULD_NOT_REPEAT",
     "</description>",
@@ -549,27 +549,27 @@ test("buildDispatchPrompt adopts Linear native prompt structure, deduplicates XM
     promptContext: promptContextWithComment,
     guidance: "Always run focused tests before PR.",
     creator: { name: "Alice Example", displayName: "alice" },
-    project: { name: "Backend App", extraInstructions: "遵守 AGENTS.md" },
+    project: { name: "Backend App", extraInstructions: "Follow AGENTS.md" },
   });
 
   assert.match(prompt1, /^Work on Linear issue ENG-101:/);
   assert.ok(
-    prompt1.includes("Suggested branch name: antigravity/eng-101-优化-outbound-sync")
+    prompt1.includes("Suggested branch name: antigravity/eng-101-optimize-outbound-sync")
   );
   assert.ok(
-    prompt1.includes('git checkout -B "antigravity/eng-101-优化-outbound-sync"')
+    prompt1.includes('git checkout -B "antigravity/eng-101-optimize-outbound-sync"')
   );
   assert.ok(prompt1.includes("Issue URL: https://linear.app/acme-workspace/issue/ENG-101"));
   assert.ok(prompt1.includes("State: Todo | Priority: High"));
   assert.ok(prompt1.includes("Triggered by: alice"));
   assert.ok(prompt1.includes("Target project: Backend App"));
-  assert.ok(!prompt1.includes("## 工单描述"));
+  assert.ok(!prompt1.includes("## Issue Description"));
   assert.equal(prompt1.split("UNIQUE_ISSUE_BODY_SHOULD_NOT_REPEAT").length - 1, 1);
   assert.ok(!prompt1.includes("## Triggering Comment"));
   assert.equal(prompt1.split("DUPLICATE_COMMENT_BODY_HERE").length - 1, 1);
   assert.ok(!prompt1.includes("Parent issue:"));
   assert.match(prompt1, /## Linear Guidance\nAlways run focused tests before PR\./);
-  assert.match(prompt1, /## 项目额外约束\n遵守 AGENTS\.md/);
+  assert.match(prompt1, /## Project Instructions\nFollow AGENTS\.md/);
 
   const prompt2 = buildDispatchPrompt({
     issueContext,
@@ -686,7 +686,7 @@ test("EventDispatcher persists suggestedBranchName, includes it in initial thoug
       "antigravity/eng-101-improve-throughput"
     );
     assert.ok(
-      activities[1].content.body.includes("建议分支：`antigravity/eng-101-improve-throughput`")
+      activities[1].content.body.includes("Suggested branch: `antigravity/eng-101-improve-throughput`")
     );
     assert.ok(launches[0].prompt.includes("Suggested branch name: antigravity/eng-101-improve-throughput"));
     assert.ok(launches[0].prompt.includes("## Linear Guidance\nWorkspace policy X"));
@@ -710,7 +710,7 @@ test("EventDispatcher persists suggestedBranchName, includes it in initial thoug
     assert.ok(resumes[0].prompt.includes("## Linear Guidance\nFollow-up policy Y"));
     assert.ok(resumes[0].prompt.includes("Run integration tests too"));
     assert.ok(!resumes[0].prompt.includes("This thread is for an agent session"));
-    assert.ok(!resumes[0].prompt.includes("## Linear Agent Session 接管与回写协议"));
+    assert.ok(!resumes[0].prompt.includes("## Linear Agent Session Callback Protocol"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -857,7 +857,7 @@ test("EventDispatcher handles stop signal immediately, cancels cloud session, lo
     // Stop signal must post confirmation response directly without preceding follow-up thought
     assert.equal(activities.length, 1);
     assert.equal(activities[0].content.type, "response");
-    assert.match(activities[0].content.body, /已收到 Linear 停止信号/);
+    assert.match(activities[0].content.body, /Received Linear stop signal/);
 
     const tok = createSessionCallbackToken({ agentSessionId: "ase-stop-1", secret: "sec-stop" });
     const blockedRes = await fetch(`http://127.0.0.1:${port}/api/sessions/ase-stop-1/activity`, {

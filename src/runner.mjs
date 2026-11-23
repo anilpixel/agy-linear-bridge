@@ -244,7 +244,7 @@ export class EdgeRunner {
         lastError: err.message,
         sessionPatch: { status: "error", lastError: err.message },
         linearActivity: {
-          content: { type: "error", body: `❌ Runner 执行失败：${err.message}` },
+          content: { type: "error", body: `❌ Runner execution failed: ${err.message}` },
         },
       }).catch((reportErr) => {
         this.logger.error?.(`[runner] Failed reporting job failure: ${reportErr.message}`);
@@ -317,9 +317,9 @@ export class EdgeRunner {
           content: {
             type: sessionCallback ? "thought" : "response",
             body: [
-              `已将追问同步并移交至云端 Remote Agent 会话继续执行。`,
-              `- 接管/续接命令：\`agy --remote-agent --conversation=${convId}\``,
-              `- 后续进展与最终交付 \`response\` 将通过 Cloudflare 边缘网关写回本会话。`,
+              `Forwarded follow-up to cloud Remote Agent session.`,
+              `- Resume/attach: \`agy --remote-agent --conversation=${convId}\``,
+              `- Live progress and final \`response\` will be reported via Cloudflare Edge.`,
             ].join("\n"),
           },
         },
@@ -446,14 +446,14 @@ export class EdgeRunner {
       lastError: null,
     };
 
-    const branchLine = suggestedBranchName ? `- 建议分支：\`${suggestedBranchName}\`` : null;
+    const branchLine = suggestedBranchName ? `- Suggested branch: \`${suggestedBranchName}\`` : null;
     const handoffLines = [
-      `🚀 已路由到 **${decision.project?.name || remoteProject}**（命中规则：\`${decision.matchedBy}\`）并拉起云端 Remote Agent，现已交由 Cloudflare 边缘网关持续接收汇报：`,
+      `🚀 Routed to **${decision.project?.name || remoteProject}** (matched by \`${decision.matchedBy}\`) and launched cloud Remote Agent via Cloudflare Edge:`,
       branchLine,
       convId
-        ? `- 接管/续接命令：\`agy --remote-agent --conversation=${convId}\``
-        : `- 会话日志：\`${launchResult.logFile}\``,
-      `- 即使本地电脑休眠或合盖，云端 Agent 仍可直接通过边缘网关汇报进度并发送 \`response\` 结单。`,
+        ? `- Resume/attach: \`agy --remote-agent --conversation=${convId}\``
+        : `- Launch log: \`${launchResult.logFile}\``,
+      `- Cloud session reports progress and final \`response\` directly to Cloudflare Edge.`,
     ].filter(Boolean);
 
     const completeResp = await this._reportJobComplete(jobId, {

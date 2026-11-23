@@ -1,7 +1,5 @@
 # agy-linear-bridge
 
-English | [简体中文](README.zh-CN.md)
-
 Bridge Linear native **Agent Sessions** (`@mention` or issue assignment with `actor=app`) directly to isolated **Antigravity Remote Agents** (`agy --remote-agent`) running in cloud ACE uVMs.
 
 > [!NOTE]

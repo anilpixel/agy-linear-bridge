@@ -149,7 +149,7 @@ export function createBridgeServer({
           sendHtml(
             res,
             400,
-            `<h1>Linear 授权失败</h1><p>${escapeHtml(desc)}</p>`
+            `<h1>Linear Authorization Failed</h1><p>${escapeHtml(desc)}</p>`
           );
           return;
         }
@@ -160,7 +160,7 @@ export function createBridgeServer({
           sendHtml(
             res,
             400,
-            "<h1>无效或已过期的 OAuth state</h1><p>请重新访问 /oauth/start。</p>"
+            "<h1>Invalid or Expired OAuth State</h1><p>Please revisit /oauth/start.</p>"
           );
           return;
         }
@@ -187,10 +187,10 @@ export function createBridgeServer({
           res,
           200,
           `<!doctype html>
-<html lang="zh-CN">
-<head><meta charset="utf-8"><title>Linear Agent 已安装</title></head>
+<html lang="en">
+<head><meta charset="utf-8"><title>Linear Agent Installed</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; line-height: 1.6;">
-  <h1>✅ Linear Agent 身份安装成功</h1>
+  <h1>✅ Linear Agent Installed</h1>
   <ul>
     <li><strong>Workspace</strong>: ${escapeHtml(org?.name || org?.urlKey || "unknown")}</li>
     <li><strong>Agent Name</strong>: ${escapeHtml(viewer?.name || "unknown")}</li>
@@ -198,7 +198,7 @@ export function createBridgeServer({
     <li><strong>App Actor</strong>: ${escapeHtml(String(viewer?.app ?? "unknown"))}</li>
     <li><strong>User ID</strong>: <code>${escapeHtml(viewer?.id || "unknown")}</code></li>
   </ul>
-  <p>Token 已安全写入本地 <code>data/tokens.json</code>（0600 权限）。你现在可以回到终端继续，或在 Linear 中直接 @ 或指派此 Agent。</p>
+  <p>Token saved to <code>data/tokens.json</code> (mode 0600). You can now return to your terminal or mention/assign this Agent in Linear.</p>
 </body>
 </html>`
         );

@@ -202,7 +202,7 @@ export class RemoteStreamWatcher {
         agentSessionId,
         content: {
           type: "thought",
-          body: `🔄 云端执行中：${text}`,
+          body: `🔄 ${text}`,
         },
         ephemeral: true,
       });
@@ -270,15 +270,15 @@ export class RemoteStreamWatcher {
           }
           const body = finalText
             ? [
-                `✅ 云端 Remote Agent 回合已结束（以下为最终输出，由观察器自动同步结单）：`,
+                `✅ Cloud Remote Agent turn completed (synced automatically by stream watcher):`,
                 "",
                 finalText,
                 "",
-                `- 接管/续接命令：\`agy --remote-agent --conversation=${entry.conversationId}\``,
+                `- Resume/attach: \`agy --remote-agent --conversation=${entry.conversationId}\``,
               ].join("\n")
             : [
-                `✅ 云端 Remote Agent 回合已结束。`,
-                `- 接管/续接命令：\`agy --remote-agent --conversation=${entry.conversationId}\``,
+                `✅ Cloud Remote Agent turn completed.`,
+                `- Resume/attach: \`agy --remote-agent --conversation=${entry.conversationId}\``,
               ].join("\n");
 
           await this._safeSendActivity({
@@ -341,10 +341,10 @@ export class RemoteStreamWatcher {
     const parameter =
       items.length === 1
         ? last.parameter
-        : `${last.parameter}（等共 ${items.length} 个云端步骤：${items
+        : `${last.parameter} (${items.length} cloud steps: ${items
             .map((i) => `${i.action} ${i.parameter}`)
             .join(" · ")
-            .slice(0, 260)}）`;
+            .slice(0, 260)})`;
 
     const now = this.nowFn();
     entry.lastActionAt = now;
@@ -376,7 +376,7 @@ export class RemoteStreamWatcher {
         agentSessionId,
         content: {
           type: "thought",
-          body: "🔄 云端会话仍在后台执行中...",
+          body: "🔄 Cloud session is still running in the background...",
         },
         ephemeral: true,
       }).catch((err) => {

@@ -35,24 +35,24 @@ function buildSessionCallbackInstructions(sessionCallback) {
   const { agentSessionId, callbackUrl, callbackToken } = sessionCallback;
   return [
     "",
-    "## Linear Agent Session 接管与回写协议（必须遵守）",
-    `- 该工单的 Linear AgentSession（\`${agentSessionId}\`）已由桥接器保持 \`active\` 状态并完整移交给你。`,
+    "## Linear Agent Session Callback Protocol (Required)",
+    `- Linear AgentSession (\`${agentSessionId}\`) is held \`active\` and handed off to you.`,
     `- **Callback URL**: \`${callbackUrl}\``,
-    `- **Authorization Bearer Token**: \`${callbackToken}\`（仅限当前 AgentSession 使用，请勿写入代码库或 PR）`,
-    "- 关键阶段务必通过 HTTPS POST 上报进度，否则 Linear 会停在思考中或 30 分钟后转为 `stale`：",
-    `  - **开始排查 / 进展保活（长任务建议每 10~15 分钟一次）**：\`{"type":"thought","body":"..."}\` 或 \`{"type":"action","action":"...","parameter":"..."}\``,
-    `  - **需要人工澄清/确认（会让会话进入 \`awaitingInput\` 等用户回复）**：\`{"type":"elicitation","body":"..."}\``,
-    `  - **最终交付结单（会把 Linear AgentSession 正式置为 \`complete\`）**：\`{"type":"response","body":"最终总结与 PR 链接"}\``,
-    `  - **附带 PR 外部链接**：创建或更新 GitHub PR 时，可在 Callback JSON 中附带 \`"prUrl":"https://github.com/owner/repo/pull/123"\`（或 \`"externalUrls":[...]\`），桥接器会自动把 PR 链接绑定到 Linear AgentSession 卡片。`,
-    `  - **不可恢复失败**：\`{"type":"error","body":"失败原因"}\``,
-    "- 调用示例：",
+    `- **Authorization Bearer Token**: \`${callbackToken}\` (scoped to this AgentSession only; never commit to git or PRs)`,
+    "- Post progress updates via HTTPS POST at key milestones so Linear does not mark the session `stale` after 30 minutes:",
+    `  - **Progress / keepalive (every 10-15 min on long runs)**: \`{"type":"thought","body":"..."}\` or \`{"type":"action","action":"...","parameter":"..."}\``,
+    `  - **Ask for human input (moves session to \`awaitingInput\`)**: \`{"type":"elicitation","body":"..."}\``,
+    `  - **Final completion (marks Linear AgentSession \`complete\`)**: \`{"type":"response","body":"Summary and PR link"}\``,
+    `  - **Attach PR link**: include \`"prUrl":"https://github.com/owner/repo/pull/123"\` (or \`"externalUrls":[...]\`) in any Callback JSON to attach the PR card to Linear.`,
+    `  - **Unrecoverable failure**: \`{"type":"error","body":"Failure reason"}\``,
+    "- Example:",
     "  ```bash",
     `  curl -fsS -X POST "${callbackUrl}" \\`,
     `    -H "Authorization: Bearer ${callbackToken}" \\`,
     `    -H "Content-Type: application/json" \\`,
-    `    -d '{"type":"thought","body":"已进入云端环境，开始排查代码"}'` ,
+    `    -d '{"type":"thought","body":"Connected to remote workspace; investigating codebase."}'`,
     "  ```",
-    "- **职责区分**：上面的 Callback 用于更新 Linear **AgentSession 生命周期**（思考/动作/提问/最终 `response` 结单）；读取上下游工单依赖、更新工单状态（如 `In Progress` / `In Review`）或补充持久工单评论，仍请使用云端 `linear` CLI（`/home/antigravity/.gemini/bin/linear`）。",
+    "- **Scope note**: Use the Callback above for **AgentSession lifecycle** updates (`thought` / `action` / `elicitation` / final `response`). Use the cloud `linear` CLI (`/home/antigravity/.gemini/bin/linear`) if you also need to read upstream issue relations, move issue workflow states (`In Progress` / `In Review`), or post standalone issue comments.",
   ];
 }
 
@@ -62,7 +62,7 @@ function buildCompactCallbackReminder(sessionCallback) {
   }
   return [
     "",
-    `> Callback（进度 \`thought\` / 最终结单 \`response\`）：\`POST ${sessionCallback.callbackUrl}\` · \`Authorization: Bearer ${sessionCallback.callbackToken}\``,
+    `> Callback (\`thought\` progress / final \`response\`): \`POST ${sessionCallback.callbackUrl}\` · \`Authorization: Bearer ${sessionCallback.callbackToken}\``,
   ];
 }
 
@@ -201,17 +201,17 @@ export function buildDispatchPrompt({
     workflowBody
       ? `\n## Repository Workflow Policy (${workflow.path || "WORKFLOW.md"})\n${workflowBody}`
       : null,
-    project?.extraInstructions ? `\n## 项目额外约束\n${project.extraInstructions}` : null,
+    project?.extraInstructions ? `\n## Project Instructions\n${project.extraInstructions}` : null,
     "",
-    "## Git 分支、PR 自动关联与回写要求",
+    "## Git Branch, PR Linking & Execution Guidelines",
     branchName
-      ? `1. **Git 分支与 PR 自动关联**：凡涉及代码修改，必须直接使用上方的 \`Suggested branch name\`（\`git checkout -B "${branchName}"\`；若远端已存在同名分支则拉取续作），不要另起 \`feat/...\` 或 \`perf/...\` 等其他分支名；提交 PR 时请在 PR 标题中保留 \`${identifier}\`，以触发 GitHub ↔ Linear 分支/PR 自动关联与状态流转。若工单明确属于只读调研或方案设计类任务，请勿改动代码也无需创建分支。`
-      : `1. **Git 分支与 PR 自动关联**：凡涉及代码修改，请创建包含工单号 \`${identifier}\` 的分支并在 PR 标题中保留 \`${identifier}\`，以触发 GitHub ↔ Linear 自动关联与状态流转；若工单属于只读调研或方案设计类任务，请勿改动代码也无需创建分支。`,
+      ? `1. **Git Branch & Linear PR Auto-Linking**: Whenever making code changes, use the exact \`Suggested branch name\` above (\`git checkout -B "${branchName}"\`, or pull & continue if the remote branch already exists) instead of inventing \`feat/...\` or \`fix/...\` branch names. Keep \`${identifier}\` in the PR title so GitHub <-> Linear auto-linking and workflow transitions trigger cleanly. For read-only research or design-only tickets, do not modify code or create branches.`
+      : `1. **Git Branch & Linear PR Auto-Linking**: Whenever making code changes, include \`${identifier}\` in both the branch name and PR title so GitHub <-> Linear auto-linking and workflow transitions trigger cleanly. For read-only research or design-only tickets, do not modify code or create branches.`,
     workflowBody
-      ? "2. **独立推进与验证**：请在当前云端 Remote Project 环境中独立完成该工单；如有代码改动，严格遵循上方 Repository Workflow Policy 与仓库规范运行检查并提交 PR。"
-      : "2. **独立推进与验证**：请在当前云端 Remote Project 环境中独立完成该工单；若仓库根目录存在 `WORKFLOW.md`，请优先读取并遵循其中的工作流与验证规范；如有代码改动，按仓库规范运行检查并提交 PR。",
-    `3. **Linear CLI 回写**：云端环境已配置 \`linear\` CLI（\`/home/antigravity/.gemini/bin/linear\`）与 \`linear\` skill，可用其读取完整上下游依赖/评论、更新工单状态（如 \`In Progress\` / \`In Review\`）或通过 \`linear issue comment add ${identifier}\` 补充持久评论。`,
-    "4. **自主推进**：不要等待本地终端交互，请一次性自主推进到阶段性交付或通过 `elicitation` 明确提问。",
+      ? "2. **Autonomous Execution & Verification**: Complete the issue autonomously inside this cloud Remote Project; when changing code, follow the Repository Workflow Policy above and run required checks before opening a PR."
+      : "2. **Autonomous Execution & Verification**: Complete the issue autonomously inside this cloud Remote Project; if a root `WORKFLOW.md` exists in the repository, read and follow its verification gates before opening a PR.",
+    `3. **Linear CLI**: If configured in the remote environment (\`/home/antigravity/.gemini/bin/linear\`), you can inspect issue relations/comments, update workflow states (\`In Progress\` / \`In Review\`), or add comments via \`linear issue comment add ${identifier}\`.`,
+    "4. **Unattended Run**: Do not wait for interactive local terminal prompts; drive the task to completion or send an explicit `elicitation` callback if blocked on human input.",
     ...buildSessionCallbackInstructions(sessionCallback),
   ];
 
@@ -268,7 +268,7 @@ export function buildGitHubFeedbackPrompt({
       feedback.detailsUrl ? `Details URL: ${feedback.detailsUrl}` : null,
       feedback.summary ? `\n## Failure Summary\n${feedback.summary}` : null,
       "",
-      `请基于分支 \`${cleanBranch || "当前 PR 分支"}\` 拉取并定位上述 CI 失败原因（可通过 \`gh run view\` / \`gh pr checks\` 查看详细日志），完成修复并在本地验证后直接 push 到同一分支。`,
+      `Pull branch \`${cleanBranch || "the current PR branch"}\`, inspect the failing CI logs (via \`gh run view\` / \`gh pr checks\`), fix the root cause, verify locally, and push to the same branch.`,
     ];
   } else {
     const fileLoc = feedback?.filePath
@@ -288,7 +288,7 @@ export function buildGitHubFeedbackPrompt({
         : null,
       feedback?.body ? `\n## Review Comment\n${feedback.body}` : null,
       "",
-      `请在分支 \`${cleanBranch || "当前 PR 分支"}\` 上评估并处理上述 Review 意见；完成修改并本地验证后直接 push 到同一分支，必要时通过 \`gh\` 回复评论并更新 Linear。`,
+      `Evaluate and address the review feedback on branch \`${cleanBranch || "the current PR branch"}\`, verify locally, push to the same branch, and reply on the PR via \`gh\` if appropriate.`,
     ];
   }
 

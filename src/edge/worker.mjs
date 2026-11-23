@@ -230,7 +230,7 @@ export function createEdgeWorkerHandler({
         const oauthError = url.searchParams.get("error");
         if (oauthError) {
           const desc = url.searchParams.get("error_description") || oauthError;
-          return htmlResponse(400, `<h1>Linear 授权失败</h1><p>${escapeHtml(desc)}</p>`);
+          return htmlResponse(400, `<h1>Linear Authorization Failed</h1><p>${escapeHtml(desc)}</p>`);
         }
 
         const code = url.searchParams.get("code");
@@ -239,7 +239,7 @@ export function createEdgeWorkerHandler({
         if (!code || !stateMeta) {
           return htmlResponse(
             400,
-            "<h1>无效或已过期的 OAuth state</h1><p>请重新访问 /oauth/start。</p>"
+            "<h1>Invalid or Expired OAuth State</h1><p>Please revisit /oauth/start.</p>"
           );
         }
 
@@ -267,10 +267,10 @@ export function createEdgeWorkerHandler({
         return htmlResponse(
           200,
           `<!doctype html>
-<html lang="zh-CN">
-<head><meta charset="utf-8"><title>Linear Agent 已安装</title></head>
+<html lang="en">
+<head><meta charset="utf-8"><title>Linear Agent Installed</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; line-height: 1.6;">
-  <h1>✅ Linear Agent 边缘身份安装成功</h1>
+  <h1>✅ Linear Agent Installed on Cloudflare Edge</h1>
   <ul>
     <li><strong>Workspace</strong>: ${escapeHtml(org?.name || org?.urlKey || "unknown")}</li>
     <li><strong>Agent Name</strong>: ${escapeHtml(viewer?.name || "unknown")}</li>
@@ -278,7 +278,7 @@ export function createEdgeWorkerHandler({
     <li><strong>App Actor</strong>: ${escapeHtml(String(viewer?.app ?? "unknown"))}</li>
     <li><strong>User ID</strong>: <code>${escapeHtml(viewer?.id || "unknown")}</code></li>
   </ul>
-  <p>OAuth Token 已加密保存至 Cloudflare D1。现在可在本地运行 <code>npm run runner</code> 连接边缘网关。</p>
+  <p>OAuth token saved to Cloudflare D1. Start your outbound runner with <code>npm run runner</code>.</p>
 </body>
 </html>`
         );
@@ -502,9 +502,9 @@ async function processLinearWebhookOnEdge({
     }
 
     const stopLines = [
-      `🛑 已收到 Linear 停止信号，Cloudflare 边缘网关已锁定后续回调写回并通知本地 Runner 中止任务。`,
+      `🛑 Received Linear stop signal. Cloudflare Edge has locked further callbacks and queued cancellation on the Runner.`,
       existing?.agyConversationId
-        ? `- 会话 ID：\`agy --remote-agent --conversation=${existing.agyConversationId}\``
+        ? `- Session ID: \`agy --remote-agent --conversation=${existing.agyConversationId}\``
         : null,
     ].filter(Boolean);
 
@@ -520,9 +520,9 @@ async function processLinearWebhookOnEdge({
 
   const ackBody = runnerStatus.online
     ? action === "prompted"
-      ? `收到补充指令，边缘网关正在转发至在线 Runner 续接工单 ${issueLabel} 的云端会话...`
-      : `已接单，边缘网关正在拉取工单 ${issueLabel} 上下文并派发给在线 Runner 启动 Antigravity Remote Agent...`
-    : `📥 已由 Cloudflare 边缘网关接单并入队（本地 Runner 当前离线或休眠，恢复在线后将自动拉起工单 ${issueLabel} 的云端会话）...`;
+      ? `Received follow-up — forwarding to online Runner to resume the cloud session for ${issueLabel}...`
+      : `Accepted ${issueLabel} — fetching issue context and dispatching to online Runner to launch Antigravity Remote Agent...`
+    : `📥 Queued on Cloudflare Edge (Runner is currently offline or asleep — the cloud session for ${issueLabel} will launch automatically when Runner reconnects)...`;
 
   await safeCreateActivity(linearClient, {
     agentSessionId,
@@ -635,9 +635,9 @@ async function processGitHubWebhookOnEdge({
         content: {
           type: "elicitation",
           body: [
-            `⚠️ GitHub CI（\`${ghEvent.name}\`）已连续触发 ${prevAttempts} 轮自动修复，达到上限（\`maxCiFixRounds=${maxRounds}\`），需要人工介入确认。`,
-            ghEvent.detailsUrl ? `- 检查详情：${ghEvent.detailsUrl}` : null,
-            session.prUrl ? `- PR 链接：${session.prUrl}` : null,
+            `⚠️ GitHub CI (\`${ghEvent.name}\`) failed after ${prevAttempts} automatic fix attempt(s), reaching the limit (\`maxCiFixRounds=${maxRounds}\`). Human review required.`,
+            ghEvent.detailsUrl ? `- Check details: ${ghEvent.detailsUrl}` : null,
+            session.prUrl ? `- Pull Request: ${session.prUrl}` : null,
           ]
             .filter(Boolean)
             .join("\n"),
@@ -662,7 +662,7 @@ async function processGitHubWebhookOnEdge({
       agentSessionId,
       content: {
         type: "thought",
-        body: `⚠️ CI 失败（${ghEvent.name}），边缘网关已入队唤醒原云端会话自动修复（第 ${attempts}/${maxRounds} 轮）...`,
+        body: `⚠️ CI failed (${ghEvent.name}) — queued cloud session resume for automatic fix (attempt ${attempts}/${maxRounds})...`,
       },
     });
 
@@ -705,7 +705,7 @@ async function processGitHubWebhookOnEdge({
       agentSessionId,
       content: {
         type: "thought",
-        body: `💬 收到 PR #${ghEvent.prNumber} Review 反馈（@${ghEvent.reviewer}），边缘网关已入队唤醒原云端会话处理...`,
+        body: `💬 Received PR #${ghEvent.prNumber} review feedback (@${ghEvent.reviewer}) — queued cloud session resume...`,
       },
     });
 

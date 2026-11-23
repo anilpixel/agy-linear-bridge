@@ -248,7 +248,7 @@ test("Cloudflare Edge Worker + D1 + Outbound EdgeRunner end-to-end: offline queu
   // Linear got an immediate offline-aware thought within the 10s rule!
   assert.equal(linearActivities.length, 1);
   assert.equal(linearActivities[0].content.type, "thought");
-  assert.match(linearActivities[0].content.body, /本地 Runner 当前离线或休眠/);
+  assert.match(linearActivities[0].content.body, /Runner is currently offline or asleep/);
 
   const healthOffline = await (await callEdge("/health")).json();
   assert.equal(healthOffline.mode, "cloudflare-edge");
@@ -359,7 +359,7 @@ test("Cloudflare Edge Worker + D1 + Outbound EdgeRunner end-to-end: offline queu
   // Watcher proxies status thoughts through Edge without local Linear token
   await runnerRef.linearProxy.createAgentActivity({
     agentSessionId: "ase-edge-1",
-    content: { type: "thought", body: "🔄 云端执行中：Running vitest" },
+    content: { type: "thought", body: "🔄 Running vitest" },
     ephemeral: true,
   });
   assert.match(linearActivities.at(-1).content.body, /Running vitest/);
@@ -460,7 +460,7 @@ test("Cloudflare Edge Worker + D1 + Outbound EdgeRunner end-to-end: offline queu
   });
   assert.equal(stopWhRes.status, 200);
   assert.equal(linearActivities.at(-1).content.type, "response");
-  assert.match(linearActivities.at(-1).content.body, /已收到 Linear 停止信号/);
+  assert.match(linearActivities.at(-1).content.body, /Received Linear stop signal/);
 
   const lateCb = await callEdge("/api/sessions/ase-edge-1/activity", {
     method: "POST",

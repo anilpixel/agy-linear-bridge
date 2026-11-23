@@ -74,8 +74,8 @@ export class EventDispatcher {
         type: "thought",
         body:
           action === "prompted"
-            ? `收到补充指令，正在定位工单 ${issueLabel} 对应的云端会话...`
-            : `已接单，正在路由工单 ${issueLabel} 并准备拉起独立 Antigravity Remote Agent...`,
+            ? `Received follow-up — locating cloud session for ${issueLabel}...`
+            : `Accepted ${issueLabel} — routing issue and launching isolated Antigravity Remote Agent...`,
       },
       ephemeral: true,
     });
@@ -103,7 +103,7 @@ export class EventDispatcher {
         agentSessionId,
         content: {
           type: "error",
-          body: `❌ 派单失败：${err.message}`,
+          body: `❌ Dispatch failed: ${err.message}`,
         },
       });
     }
@@ -148,20 +148,20 @@ export class EventDispatcher {
     this.stopRequested.delete(agentSessionId);
 
     const lines = [
-      `🛑 已收到 Linear 停止信号，桥接器已停止状态监听并锁定后续回调写回。`,
+      `🛑 Received Linear stop signal. Stream watcher stopped and further callbacks are now locked.`,
     ];
     if (existing?.agyConversationId) {
       if (cancelResult?.cancelled) {
-        lines.push(`- 已向云端会话发送取消信号（\`Esc\`）并确认停止运行。`);
+        lines.push(`- Sent cancel signal (\`Esc\`) to cloud session and confirmed idle.`);
       } else if (cancelResult && cancelResult.ok && !cancelResult.wasRunning) {
-        lines.push(`- 附着云端会话时已处于空闲状态。`);
+        lines.push(`- Cloud session was already idle when attached.`);
       } else if (cancelResult?.stillRunning) {
         lines.push(
-          `- 已向云端会话发送取消信号（\`Esc\`），如云端工具命令仍在收尾可在终端接管确认。`
+          `- Sent cancel signal (\`Esc\`) to cloud session; attach in terminal if a tool command is still winding down.`
         );
       }
       lines.push(
-        `- 会话 ID：\`agy --remote-agent --conversation=${existing.agyConversationId}\``
+        `- Session ID: \`agy --remote-agent --conversation=${existing.agyConversationId}\``
       );
     }
 
@@ -229,17 +229,17 @@ export class EventDispatcher {
         ? {
             type: "thought",
             body: [
-              `已将追问同步并移交至云端 Remote Agent 会话继续执行。`,
-              `- 接管/续接命令：\`agy --remote-agent --conversation=${convId}\``,
-              `- 后续进展与最终交付 \`response\` 将由云端 Agent 直接通过回调写回本会话。`,
+              `Forwarded follow-up to cloud Remote Agent session.`,
+              `- Resume/attach: \`agy --remote-agent --conversation=${convId}\``,
+              `- Live progress and final \`response\` will be reported via session callback.`,
             ].join("\n"),
           }
         : {
             type: "response",
             body: [
-              `✅ 已将追问转发至原云端 Remote Agent 会话。`,
-              `- 续接命令：\`agy --remote-agent --conversation=${convId}\``,
-              `- 后续进展将由该云端 Agent 直接在工单评论中更新。`,
+              `✅ Forwarded follow-up to cloud Remote Agent session.`,
+              `- Resume command: \`agy --remote-agent --conversation=${convId}\``,
+              `- Further updates will be posted directly on the issue.`,
             ].join("\n"),
           },
     });
@@ -428,23 +428,23 @@ export class EventDispatcher {
       externalUrls: initialExternalUrls,
     });
 
-    const branchLine = suggestedBranchName ? `- 建议分支：\`${suggestedBranchName}\`` : null;
+    const branchLine = suggestedBranchName ? `- Suggested branch: \`${suggestedBranchName}\`` : null;
     const handoffLines = [
-      `🚀 已路由到 **${decision.project?.name || remoteProject}**（命中规则：\`${decision.matchedBy}\`）并启动云端 Remote Agent，现已将 Linear AgentSession（\`active\`）移交其持续接力汇报：`,
+      `🚀 Routed to **${decision.project?.name || remoteProject}** (matched by \`${decision.matchedBy}\`) and launched cloud Remote Agent; Linear AgentSession (\`active\`) handed off:`,
       branchLine,
       convId
-        ? `- 接管/续接命令：\`agy --remote-agent --conversation=${convId}\``
-        : `- 会话日志：\`${launchResult.logFile}\`（未捕获到 \`--conversation\` ID，可查看 \`antigravity.google.com\`）`,
-      `- 云端 Agent 将通过回调持续发送思考/动作进度，并在完成后自行发送最终 \`response\` 结单。`,
+        ? `- Resume/attach: \`agy --remote-agent --conversation=${convId}\``
+        : `- Launch log: \`${launchResult.logFile}\` (\`--conversation\` ID not captured; check \`antigravity.google.com\`)`,
+      `- Cloud Agent will stream progress via callbacks and post the final \`response\` upon completion.`,
     ].filter(Boolean);
 
     const standaloneLines = [
-      `✅ 已路由到 **${decision.project?.name || remoteProject}**（命中规则：\`${decision.matchedBy}\`）并拉起独立云端 Remote Agent 会话。`,
+      `✅ Routed to **${decision.project?.name || remoteProject}** (matched by \`${decision.matchedBy}\`) and launched isolated cloud Remote Agent.`,
       branchLine,
       convId
-        ? `- 接管/续接命令：\`agy --remote-agent --conversation=${convId}\``
-        : `- 会话日志：\`${launchResult.logFile}\`（未捕获到 \`--conversation\` ID，可查看 \`antigravity.google.com\`）`,
-      `- 后续进度、提问与 PR 将由该云端 Agent 直接通过云端 \`linear\` CLI 回写到本工单。`,
+        ? `- Resume/attach: \`agy --remote-agent --conversation=${convId}\``
+        : `- Launch log: \`${launchResult.logFile}\` (\`--conversation\` ID not captured; check \`antigravity.google.com\`)`,
+      `- Further progress, questions, and PRs will be posted via the cloud \`linear\` CLI.`,
     ].filter(Boolean);
 
     await this._safeSendActivity({
@@ -538,9 +538,9 @@ export class EventDispatcher {
             content: {
               type: "elicitation",
               body: [
-                `⚠️ GitHub CI（\`${ghEvent.name}\`）已连续触发 ${prevAttempts} 轮自动修复，已达到上限（\`maxCiFixRounds=${maxRounds}\`），需要人工介入确认。`,
-                ghEvent.detailsUrl ? `- 检查详情：${ghEvent.detailsUrl}` : null,
-                latest.prUrl ? `- PR 链接：${latest.prUrl}` : null,
+                `⚠️ GitHub CI (\`${ghEvent.name}\`) failed after ${prevAttempts} automatic fix attempt(s), reaching the limit (\`maxCiFixRounds=${maxRounds}\`). Human review required.`,
+                ghEvent.detailsUrl ? `- Check details: ${ghEvent.detailsUrl}` : null,
+                latest.prUrl ? `- Pull Request: ${latest.prUrl}` : null,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -568,7 +568,7 @@ export class EventDispatcher {
           agentSessionId,
           content: {
             type: "thought",
-            body: `⚠️ CI 失败（${ghEvent.name}），正在自动唤醒云端会话修复（第 ${attempts}/${maxRounds} 轮）...`,
+            body: `⚠️ CI failed (${ghEvent.name}) — resuming cloud session for automatic fix (attempt ${attempts}/${maxRounds})...`,
           },
         });
 
@@ -642,7 +642,7 @@ export class EventDispatcher {
           agentSessionId,
           content: {
             type: "thought",
-            body: `💬 收到 PR #${ghEvent.prNumber} Review 反馈（@${ghEvent.reviewer}），正在自动唤醒云端会话处理...`,
+            body: `💬 Received PR #${ghEvent.prNumber} review feedback (@${ghEvent.reviewer}) — resuming cloud session...`,
           },
         });
 

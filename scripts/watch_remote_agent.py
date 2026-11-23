@@ -159,16 +159,16 @@ def extract_snapshot(lines: list[str]) -> dict:
     status_parts: list[str] = []
     if is_running:
         if running_task and raw_spinner_text:
-            status_parts.append(f"运行命令 `{running_task[:120]}` · {raw_spinner_text}")
+            status_parts.append(f"Running `{running_task[:120]}` · {raw_spinner_text}")
         elif running_task:
-            status_parts.append(f"运行命令 `{running_task[:160]}`")
+            status_parts.append(f"Running `{running_task[:160]}`")
         elif raw_spinner_text:
             status_parts.append(raw_spinner_text)
         elif latest_thought:
             tail_info = f" ({latest_more_actions})" if latest_more_actions else ""
             status_parts.append(f"Thought for {latest_thought}{tail_info}")
         elif has_esc_cancel:
-            status_parts.append("云端执行中")
+            status_parts.append("Running in cloud")
 
     status_text = " ".join(status_parts).strip()[:240]
     final_text = _extract_final_text(content_lines) if is_idle else ""

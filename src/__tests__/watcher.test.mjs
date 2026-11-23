@@ -101,8 +101,8 @@ test("watch_remote_agent.py extract_snapshot parses running tasks, actions, igno
     "○ Thought for 2m 10s",
     "● Ran (pnpm test)",
     "▸ Thought for 5s, 312 tokens",
-    "  已完成修复并提交 PR #128。",
-    "  实测单批耗时从 84s 降至 6.4s。",
+    "  Completed fix and opened PR #128.",
+    "  Batch latency dropped from 84s to 6.4s.",
     "────────────────────────────────────────────────────────────────────────",
     ">",
     "────────────────────────────────────────────────────────────────────────",
@@ -111,8 +111,8 @@ test("watch_remote_agent.py extract_snapshot parses running tasks, actions, igno
   const idleSnap = parseSnapshotWithPython(idleFrame);
   assert.equal(idleSnap.isRunning, false);
   assert.equal(idleSnap.isIdle, true);
-  assert.match(idleSnap.finalText, /已完成修复并提交 PR #128/);
-  assert.match(idleSnap.finalText, /84s 降至 6\.4s/);
+  assert.match(idleSnap.finalText, /Completed fix and opened PR #128/);
+  assert.match(idleSnap.finalText, /84s to 6\.4s/);
 });
 
 test("RemoteStreamWatcher throttles status/actions, deduplicates actions, runs idle fallback only when active, and stops cleanly", async () => {
@@ -222,12 +222,12 @@ test("RemoteStreamWatcher throttles status/actions, deduplicates actions, runs i
     // Idle while still active -> sends fallback response & completes session
     await watcher.handleWatcherEvent("sess-1", {
       event: "idle",
-      finalText: "已完成排查并修复 PR #99",
+      finalText: "Investigated root cause and fixed in PR #99",
     });
     await new Promise((resolve) => setTimeout(resolve, 90));
     assert.equal(activities.length, 4);
     assert.equal(activities[3].content.type, "response");
-    assert.match(activities[3].content.body, /已完成排查并修复 PR #99/);
+    assert.match(activities[3].content.body, /Investigated root cause and fixed in PR #99/);
     assert.equal(sessionStore.get("sess-1").status, "complete");
     assert.equal(watcher.activeCount(), 0);
     assert.deepEqual(spawned[0].child.killedSignals, ["SIGTERM"]);

@@ -244,7 +244,7 @@ pause "Press Enter once both are running to open the Linear OAuth install page..
 open_url "${PUBLIC_BASE_URL}/oauth/start"
 step "In your browser, authorize the app for your Linear workspace."
 step "Confirm permissions include read, write, app:assignable, app:mentionable."
-step "Wait until the browser shows 'Linear Agent 身份安装成功'."
+step "Wait until the browser shows 'Linear Agent Installed'."
 pause "Press Enter after the browser confirms installation..."
 
 stage "Verify Live Linear Agent Identity"

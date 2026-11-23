@@ -102,7 +102,7 @@ function buildRoutingPrompt({ issueContext, promptContext, projectsConfig }) {
 
   return [
     "You are a stateless dispatcher for Linear issues into Antigravity Remote Projects.",
-    "Choose either action='dispatch' with an exact projectKey from the catalog below, OR action='elicit' with a concise Chinese clarifyingQuestion if the target project is ambiguous or critical scope is missing.",
+    "Choose either action='dispatch' with an exact projectKey from the catalog below, OR action='elicit' with a concise English clarifyingQuestion if the target project is ambiguous or critical scope is missing.",
     "Do NOT invent projectKey values outside the catalog. Do NOT call any tools.",
     "",
     `Project Catalog:\n${JSON.stringify(catalog, null, 2)}`,
@@ -184,7 +184,7 @@ export async function routeWithLlmAgent({
       matchedBy: "llm",
       clarifyingQuestion:
         decision.clarifyingQuestion ||
-        "请补充这条工单所属的目标项目或需要修改的具体范围，我再帮你派发到对应远端环境。",
+        "Which target project or repository does this issue belong to?",
       reason: decision.reason || "LLM router requested clarification",
     };
   }
@@ -224,7 +224,7 @@ export async function routeWithLlmAgent({
     matchedBy: "llmFallback",
     clarifyingQuestion:
       decision.clarifyingQuestion ||
-      "暂时无法确定这条工单归属哪个项目，请告诉我目标项目名称或仓库。",
+      "Could not determine the target project for this issue. Please specify the project name or repository.",
     reason: "Unknown projectKey returned and no defaultRemoteProject configured",
   };
 }
@@ -283,13 +283,13 @@ export async function routeIssue({
         .map((p) => p?.name || p?.key)
         .filter(Boolean)
         .slice(0, 5);
-      const projectHint = sampleNames.length ? `（例如 ${sampleNames.join(" / ")}）` : "";
+      const projectHint = sampleNames.length ? ` (e.g. ${sampleNames.join(" / ")})` : "";
       return {
         action: "elicit",
         project: null,
         remoteProject: null,
         matchedBy: "routerError",
-        clarifyingQuestion: `请确认这条工单属于哪个项目${projectHint}？`,
+        clarifyingQuestion: `Which project should handle this issue${projectHint}?`,
         reason: `Router failed: ${err.message}`,
       };
     }
@@ -316,7 +316,7 @@ export async function routeIssue({
     project: null,
     remoteProject: null,
     matchedBy: "unmatched",
-    clarifyingQuestion: "未匹配到对应项目，请补充这条工单所属的项目或团队。",
+    clarifyingQuestion: "No matching project configured. Please specify the target project or team.",
     reason: "No deterministic match and no defaultRemoteProject configured",
   };
 }
