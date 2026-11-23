@@ -12,15 +12,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
+          cache: "npm"
 
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install dev dependencies
+        run: npm ci
 
       - name: Validate Python scripts
         run: >
@@ -30,5 +34,8 @@ jobs:
           scripts/cancel_remote_agent.py
           scripts/provision_remote_projects.py
 
-      - name: Run unit tests
+      - name: Build Cloudflare Edge Worker bundle
+        run: npx cf build
+
+      - name: Run unit & edge integration tests
         run: npm test

@@ -263,6 +263,17 @@ export function loadConfig(
         .map((s) => s.trim().toLowerCase())
         .filter(Boolean),
     },
+    edge: {
+      baseUrl: String(env.EDGE_BASE_URL || publicBaseUrl || "")
+        .trim()
+        .replace(/\/+$/, ""),
+      runnerSecret: String(env.RUNNER_SHARED_SECRET || "").trim(),
+      runnerId: String(env.RUNNER_ID || "").trim(),
+      pollIntervalMs:
+        env.RUNNER_POLL_INTERVAL_MS !== undefined && env.RUNNER_POLL_INTERVAL_MS !== ""
+          ? Math.max(500, Number(env.RUNNER_POLL_INTERVAL_MS) || 3_000)
+          : 3_000,
+    },
     projectsConfig,
   };
 }

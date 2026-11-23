@@ -18,10 +18,20 @@
   },
   "scripts": {
     "start": "node src/cli.mjs serve",
+    "runner": "node src/cli.mjs runner",
+    "runner:systemd": "bash scripts/install-systemd-runner.sh",
+    "edge:build": "cf build",
+    "edge:deploy": "cf deploy",
+    "edge:seed": "node src/cli.mjs edge-seed",
     "test": "node --test src/__tests__/*.test.mjs",
     "verify-identity": "node src/cli.mjs verify-identity",
     "route-test": "node src/cli.mjs route-test",
     "setup:tunnel": "bash scripts/setup-tunnel.sh",
     "setup:linear": "bash scripts/setup-linear-agent.sh"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^2.0.0-rc.3",
+    "cf": "^1.0.0-rc.2",
+    "vite": "^8.3.8"
   }
 }

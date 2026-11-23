@@ -13,22 +13,26 @@
 
 ```mermaid
 flowchart LR
-  Linear["Linear Workspace (actor=app)"] -->|"AgentSessionEvent Webhook"| Bridge["agy-linear-bridge (Node.js HTTP Server)"]
-  Bridge -->|"规则匹配 + 无状态 Flash 路由"| Launcher["PTY 发射器 (scripts/launch_remote_agent.py)"]
-  Bridge -.->|"本地目录或 gh api 拉取"| Workflow["仓库 WORKFLOW.md 策略"]
+  Linear["Linear Workspace (actor=app)"] -->|"AgentSessionEvent Webhook"| Edge["Cloudflare Edge Worker + D1 (24/7 在线)"]
+  GitHub["GitHub 仓库 Webhook"] -->|"PR 同步 / CI 失败 / Review 评论"| Edge
+  Runner["本地出站 Runner (npm run runner)"] -->|"纯出站 HTTPS 轮询与回写"| Edge
+  Runner -->|"规则/Flash 路由 + WORKFLOW.md"| Launcher["PTY 发射器 (scripts/launch_remote_agent.py)"]
   Launcher -->|"拉起隔离云端会话"| Agy["Antigravity Cloud uVM (agy --remote-agent)"]
-  Agy -->|"HTTPS Callback (thought / action / response / prUrl)"| Bridge
-  Watcher["只读 PTY 流式监听器"] -.->|"实时进度、工具动作与 PR 链接同步"| Bridge
-  Bridge -->|"AgentActivity 与 externalUrls"| Linear
-  GitHub["GitHub 仓库 Webhook"] -->|"PR 同步 / CI 失败 / Review 评论"| Bridge
-  Bridge -->|"--conversation 续接修复"| Launcher
+  Agy -->|"HTTPS Callback (合盖休眠期间照常直连边缘)"| Edge
+  Watcher["只读 PTY 流式监听器"] -.->|"实时进度经边缘网关同步"| Edge
+  Edge -->|"AgentActivity 与 externalUrls"| Linear
 ```
 
 ---
 
 ## 核心特性
 
-- **零外部 npm 依赖**：仅使用 Node.js `>= 22` 内置模块与 Python 3 标准库。
+- **Cloudflare Workers + D1 免费边缘层 + 本地无端口 Runner（推荐架构）**：
+  - **Cloudflare 边缘网关 24/7 在线**：托管 OAuth Token 轮换、5 秒内秒回 Linear/GitHub Webhook、10 秒内首发 `thought`，并全天候接收云端 `ACE uVM` 的 Callback。
+  - **免配 `cloudflared` 隧道、免域名、本机零入站端口**。
+  - **不怕电脑合盖休眠**：云端会话一旦点火，合上电脑后云端 Agent 仍能直连边缘网关更新进度、挂 PR 链接并结单；休眠期间的新工单会自动在 D1 安全入队，开盖后 Runner 自动认领拉起。
+  - 同时完整保留 **单进程本地直连模式**（`npm start` + 隧道）。
+- **零外部运行时依赖**：本地 Runner 与服务仅依赖 Node.js `>= 22` 内置模块与 Python 3 标准库（`cf` CLI 仅作为构建和部署边缘 Worker 的开发依赖）。
 - **零本地 Git worktree 维护**：任务直接在 Antigravity 云端 ACE uVM 中执行，无需在本地维护多仓库 clone 与清理 worktree。
 - **符合 Linear Agent 原生协议**：通过 `actor=app` OAuth 授权安装，自动满足 5 秒 Webhook ACK、10 秒内首发 `thought` 与活跃会话生命周期管理。
 - **混合多项目路由**：先按确定性规则（`projectId` → `projectSlug` → `projectName` → `labels` → 唯一 `teamKey`）匹配 `config/projects.json`，未命中时可选用无状态 `agy -p` Flash 兜底路由或发 `elicitation` 向人工澄清。
@@ -61,31 +65,56 @@ cp config/projects.example.json config/projects.json
 
 > **提示**：可在 `agy --remote-agent` 内运行 `/config` 检查远端代理的权限预设与计划审批策略，避免长任务无人值守时卡在审批提示。
 
-### 2. 启动公网 HTTPS 隧道
+### 2. 部署模式 A（推荐）：Cloudflare 边缘网关 + D1 + 本地无端口 Runner
+
+无需 `cloudflared` 隧道，本机不监听任何端口：
+
+```bash
+npm install
+npx cf auth login
+
+# 生成边缘网关与本地 Runner 共享密钥，填入 .env 的 RUNNER_SHARED_SECRET
+openssl rand -hex 32
+
+# 一键部署 Worker 并自动创建 D1 数据库
+npm run edge:deploy -- --secrets-file .env
+```
+
+将部署输出的域名（`https://<name>.<subdomain>.workers.dev` 或通过 `WORKER_CUSTOM_DOMAIN` 绑定的自定义域名）写入 `.env` 的 `PUBLIC_BASE_URL` 与 `EDGE_BASE_URL`，在 Linear OAuth 应用填好回调与 Webhook 地址后访问 `<URL>/oauth/start` 完成一次授权（若本地已有 `data/tokens.json`，也可直接运行 `npm run edge:seed` 无感迁移进 D1）。
+
+随后在本地或任意常驻 Linux 云主机（如 Oracle Cloud 免费 ARM 实例、1C1G VPS，无需公网入站端口或域名）启动纯出站 Runner 即可：
+
+```bash
+# 前台启动（macOS / Linux）：
+npm run runner
+
+# 或在 Linux 云主机注册为 24/7 开机自启的 systemd 用户级后台服务：
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+~/.local/bin/agy   # 完成一次 SSH 远程 Google OAuth 登录授权后 /exit
+npm run runner:systemd
+```
+
+### 3. 部署模式 B（备选）：单进程本地服务 + 公网 HTTPS 隧道
+
+如果不使用 Cloudflare Workers，也可直接单进程在本地运行：
 
 - **方式 A：Quick Tunnel（零域名，最快联调）**：
   ```bash
   cloudflared tunnel --no-autoupdate --config /dev/null --url http://127.0.0.1:8787
   ```
-- **方式 B：固定自定义域名（适合长期运行，脚本仅写当前目录 `./cloudflared.yml`，不修改 `~/.cloudflared/config.yml`）**：
+- **方式 B：固定自定义域名**：
   ```bash
   bash scripts/setup-tunnel.sh bridge.example.com
   cloudflared tunnel --config ./cloudflared.yml run
   ```
 
-### 3. 启动桥接服务并安装 Linear App（`actor=app`）
+启动本地服务并运行交互式安装向导：
 
 ```bash
 npm start
-```
-
-另开终端运行交互式安装向导：
-
-```bash
+# 另开终端：
 npm run setup:linear
 ```
-
-向导会把 `PUBLIC_BASE_URL`、`LINEAR_CLIENT_ID`、`LINEAR_CLIENT_SECRET` 与 `LINEAR_WEBHOOK_SECRET` 写入 `.env`（`0600` 权限）。写完后**重启一次 `npm start`**，在浏览器完成 Linear Workspace 授权，脚本会自动校验 `viewer.app === true`。
 
 ### 4. 可选：启用 GitHub CI/Review 自动闭环
 

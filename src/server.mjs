@@ -113,7 +113,7 @@ export function createBridgeServer({
           authConfigured: Boolean(config.linear.clientId && config.linear.clientSecret),
           webhookConfigured: Boolean(config.linear.webhookSecret),
           githubWebhookConfigured: Boolean(config.github?.webhookSecret),
-          hasToken: tokenManager.hasToken(),
+          hasToken: Boolean(await tokenManager.hasToken()),
           sessionsCount: sessionStore.count(),
           projectsCount: getProjectsConfig(config).projects.length,
           activeWatchers: watcher.activeCount(),
@@ -172,7 +172,7 @@ export function createBridgeServer({
           redirectUri,
           code,
         });
-        tokenManager.saveInitialOAuthToken(tokenResp);
+        await tokenManager.saveInitialOAuthToken(tokenResp);
 
         let viewerInfo = null;
         try {

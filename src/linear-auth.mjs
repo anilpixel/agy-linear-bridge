@@ -182,19 +182,28 @@ export class LinearTokenManager {
 
   hasToken() {
     const stored = this.tokenStore.load();
+    if (stored && typeof stored.then === "function") {
+      return stored.then((s) => Boolean(s?.accessToken));
+    }
     return Boolean(stored?.accessToken);
   }
 
-  saveInitialOAuthToken(rawTokenResponse) {
+  async saveInitialOAuthToken(rawTokenResponse) {
     const record = normalizeTokenRecord(rawTokenResponse, {
       authMode: "oauth",
       nowMs: this.nowFn(),
     });
-    return this.tokenStore.save(record);
+    return await this.tokenStore.save(record);
   }
 
   async getAccessToken({ forceRefresh = false } = {}) {
-    const stored = this.tokenStore.load();
+    if (this._inflightRefresh) {
+      return this._inflightRefresh;
+    }
+
+    const loaded = this.tokenStore.load();
+    const stored =
+      loaded && typeof loaded.then === "function" ? await loaded : loaded;
     const now = this.nowFn();
     const isFresh =
       stored?.accessToken &&
@@ -235,7 +244,7 @@ export class LinearTokenManager {
         previousRefreshToken: stored.refreshToken,
         nowMs: now,
       });
-      this.tokenStore.save(updated);
+      await this.tokenStore.save(updated);
       return updated.accessToken;
     }
 
@@ -255,7 +264,7 @@ export class LinearTokenManager {
         authMode: "client_credentials",
         nowMs: now,
       });
-      this.tokenStore.save(updated);
+      await this.tokenStore.save(updated);
       return updated.accessToken;
     }
 

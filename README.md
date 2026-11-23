@@ -13,22 +13,26 @@ Bridge Linear native **Agent Sessions** (`@mention` or issue assignment with `ac
 
 ```mermaid
 flowchart LR
-  Linear["Linear Workspace (actor=app)"] -->|"AgentSessionEvent Webhook"| Bridge["agy-linear-bridge (Node.js HTTP Server)"]
-  Bridge -->|"Rules + Stateless Flash Router"| Launcher["PTY Launcher (scripts/launch_remote_agent.py)"]
-  Bridge -.->|"Optional local / gh api fetch"| Workflow["Per-repo WORKFLOW.md"]
+  Linear["Linear Workspace (actor=app)"] -->|"AgentSessionEvent Webhook"| Edge["Cloudflare Edge Worker + D1 (24/7)"]
+  GitHub["GitHub Repository Webhook"] -->|"PR sync, CI failure, PR review"| Edge
+  Runner["Local Outbound Runner (npm run runner)"] -->|"Outbound HTTPS poll & job complete"| Edge
+  Runner -->|"Rules + Flash Router + WORKFLOW.md"| Launcher["PTY Launcher (scripts/launch_remote_agent.py)"]
   Launcher -->|"Spawns isolated session"| Agy["Antigravity Cloud uVM (agy --remote-agent)"]
-  Agy -->|"HTTPS Callback (thought / action / response / prUrl)"| Bridge
-  Watcher["Read-only PTY Stream Watcher"] -.->|"Live status, tool actions, PR URL sync"| Bridge
-  Bridge -->|"AgentActivity & externalUrls"| Linear
-  GitHub["GitHub Repository Webhook"] -->|"PR sync, CI failure, PR review"| Bridge
-  Bridge -->|"--conversation resume (CI/Review loop)"| Launcher
+  Agy -->|"HTTPS Callback (works even with laptop closed)"| Edge
+  Watcher["Read-only PTY Stream Watcher"] -.->|"Live status & actions via Edge"| Edge
+  Edge -->|"AgentActivity & externalUrls"| Linear
 ```
 
 ---
 
 ## Why Use This
 
-- **Zero npm runtime dependencies**: Built purely on Node.js `>= 22` built-in modules and the Python 3 standard library.
+- **24/7 Free-Tier Cloudflare Edge + Outbound Runner (Recommended)**:
+  - **Cloudflare Workers + D1** handles Linear/GitHub webhooks, 5s ACK / 10s initial `thought`, OAuth token rotation, and cloud `ACE uVM` callbacks 24/7 on Cloudflare's free tier.
+  - **No `cloudflared` tunnel, no custom domain required, zero inbound ports** on your machine.
+  - **Sleep-resilient**: Once a cloud session is launched, closing your laptop does not interrupt callbacks, PR attachment, or completion; new issues arriving while offline are safely queued in D1 and launched automatically when your Runner wakes up.
+  - Also supports **Standalone Local Server mode** (`npm start` + tunnel) if you prefer single-process hosting.
+- **Zero npm runtime dependencies**: Local Runner and server rely purely on Node.js `>= 22` built-in modules and the Python 3 standard library (`cf` CLI is a devDependency used only to build/deploy the Edge Worker).
 - **Zero local Git worktrees**: Work executes in Antigravity cloud ACE uVMs instead of cloning/cleaning multi-repo worktrees locally.
 - **Native Linear Agent identity (`actor=app`)**: Satisfies Linear's 5-second webhook ACK and 10-second initial `thought` activity rules out of the box.
 - **Hybrid multi-project routing**: Deterministic matching first (`projectId` → `projectSlug` → `projectName` → `labels` → unambiguous `teamKey`), optional stateless `agy -p` Flash fallback, or `elicitation` follow-up when ambiguous.
@@ -61,31 +65,56 @@ Start an interactive `agy --remote-agent` session and run `/projects` to inspect
 
 > **Tip**: In `agy --remote-agent`, run `/config` and verify that **Permission Preset** and **Plan Review Policy** match your unattended automation preference.
 
-### 2. Start a Public HTTPS Tunnel
+### 2. Deploy Mode A (Recommended): Cloudflare Edge Worker + D1 + Outbound Runner
 
-- **Quick Tunnel (fastest for local testing)**:
+No `cloudflared` tunnel or inbound ports needed:
+
+```bash
+npm install
+npx cf auth login
+
+# Generate a shared secret between Edge Worker and your local Runner
+openssl rand -hex 32   # save as RUNNER_SHARED_SECRET in .env
+
+# Deploy Worker + auto-provisioned D1 database (pass secrets via .env or JSON file)
+npm run edge:deploy -- --secrets-file .env
+```
+
+Copy the deployed Worker URL (`https://<name>.<subdomain>.workers.dev` or custom domain via `WORKER_CUSTOM_DOMAIN`), set `PUBLIC_BASE_URL` and `EDGE_BASE_URL` in `.env`, configure your Linear OAuth App (`Callback: <URL>/oauth/callback`, `Webhook: <URL>/webhooks/linear`) and visit `<URL>/oauth/start` once to authorize `actor=app` into D1 (or migrate an existing local `data/tokens.json` with `npm run edge:seed`).
+
+Then start the outbound-only Runner locally (or on an always-on headless Linux VM such as Oracle Cloud Free Tier — no public IP or inbound ports required):
+
+```bash
+# Run in foreground (macOS / Linux):
+npm run runner
+
+# Or install as a persistent 24/7 user-level systemd service on Linux:
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+~/.local/bin/agy   # complete one-time Remote SSH Google OAuth login, then /exit
+npm run runner:systemd
+```
+
+### 3. Deploy Mode B (Alternative): Standalone Local Server + HTTPS Tunnel
+
+If you prefer running everything in a single local process without Cloudflare Workers:
+
+- **Quick Tunnel**:
   ```bash
   cloudflared tunnel --no-autoupdate --config /dev/null --url http://127.0.0.1:8787
   ```
-- **Named Tunnel (recommended for a custom domain)**:
+- **Named Tunnel**:
   ```bash
   bash scripts/setup-tunnel.sh bridge.example.com
   cloudflared tunnel --config ./cloudflared.yml run
   ```
 
-### 3. Start the Bridge & Install Linear App (`actor=app`)
+Start the local server and run the guided Linear OAuth wizard:
 
 ```bash
 npm start
-```
-
-In a second terminal, run the guided setup wizard:
-
-```bash
+# In another terminal:
 npm run setup:linear
 ```
-
-The wizard writes `PUBLIC_BASE_URL`, `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, and `LINEAR_WEBHOOK_SECRET` to `.env` (`0600`). Restart `npm start`, complete the browser OAuth flow, and the script will automatically verify `viewer.app === true`.
 
 ### 4. Optional: Enable GitHub CI & Review Loop
 

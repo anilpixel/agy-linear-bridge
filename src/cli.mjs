@@ -4,8 +4,9 @@ import { loadConfig } from "./config.mjs";
 import { LinearTokenManager } from "./linear-auth.mjs";
 import { LinearClient } from "./linear-client.mjs";
 import { routeIssue } from "./router.mjs";
+import { EdgeRunner } from "./runner.mjs";
 import { createBridgeServer } from "./server.mjs";
-import { TokenStore } from "./store.mjs";
+import { SessionStore, TokenStore } from "./store.mjs";
 
 function parseFlags(args) {
   const flags = {};
@@ -46,6 +47,59 @@ async function cmdServe(config) {
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+async function cmdRunner(config) {
+  if (!config.edge.baseUrl || !config.edge.runnerSecret) {
+    throw new Error(
+      "Runner mode requires EDGE_BASE_URL (or PUBLIC_BASE_URL) and RUNNER_SHARED_SECRET in .env"
+    );
+  }
+  const runner = new EdgeRunner({ config });
+  // Perform one immediate poll so auth/connectivity errors surface right on startup
+  await runner.pollOnce();
+  runner.start();
+  console.log(
+    `[agy-linear-bridge:runner] Connected to edge=${config.edge.baseUrl} runnerId=${runner.runnerId} (outbound-only, zero local ports)`
+  );
+
+  const shutdown = (signal) => {
+    console.log(`[agy-linear-bridge:runner] Received ${signal}, stopping watchers...`);
+    runner.stop();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
+
+async function cmdEdgeSeed(config) {
+  const edgeBaseUrl = config.edge.baseUrl;
+  const runnerSecret = config.edge.runnerSecret;
+  if (!edgeBaseUrl || !runnerSecret) {
+    throw new Error(
+      "edge-seed requires EDGE_BASE_URL (or PUBLIC_BASE_URL) and RUNNER_SHARED_SECRET in .env"
+    );
+  }
+
+  const tokenStore = new TokenStore(config.paths.tokensFile);
+  const sessionStore = new SessionStore(config.paths.sessionsFile);
+  const token = tokenStore.load();
+  const sessions = sessionStore.list();
+
+  const res = await fetch(`${edgeBaseUrl}/api/runner/bootstrap`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${runnerSecret}`,
+    },
+    body: JSON.stringify({ token, sessions }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`edge-seed failed (${res.status}): ${text}`);
+  }
+  console.log(text);
 }
 
 async function cmdVerifyIdentity(config) {
@@ -110,7 +164,9 @@ function printHelp() {
   console.log(`Usage: node src/cli.mjs <command>
 
 Commands:
-  serve            Start the HTTP webhook & OAuth server
+  runner           Start zero-port outbound Runner polling Cloudflare Edge Gateway
+  edge-seed        Migrate local data/tokens.json & data/sessions.json into Cloudflare D1
+  serve            Start standalone all-in-one local HTTP webhook & OAuth server
   verify-identity  Verify persisted Linear actor=app identity
   route-test       Test deterministic/LLM routing (--project, --team, --title, --description, --file)
 `);
@@ -120,6 +176,14 @@ async function main() {
   const [, , command, ...rest] = process.argv;
   const config = loadConfig();
 
+  if (command === "runner") {
+    await cmdRunner(config);
+    return;
+  }
+  if (command === "edge-seed") {
+    await cmdEdgeSeed(config);
+    return;
+  }
   if (command === "serve") {
     await cmdServe(config);
     return;
