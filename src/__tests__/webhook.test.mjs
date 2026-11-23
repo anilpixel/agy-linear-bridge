@@ -168,7 +168,10 @@ test("parseAgentSessionEvent detects stop signals and agentActivity prompt bodie
   const followUpFromContent = parseAgentSessionEvent({
     type: "AgentSessionEvent",
     action: "prompted",
-    agentSession: { id: "ase-follow-1" },
+    agentSession: {
+      id: "ase-follow-1",
+      comment: { id: "root-c", body: "This thread is for an agent session with antigravity." },
+    },
     agentActivity: { content: { type: "prompt", body: "Continue with tests" } },
   });
   assert.equal(followUpFromContent.isStopSignal, false);

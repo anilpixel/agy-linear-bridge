@@ -47,6 +47,10 @@ export function verifyLinearWebhook({
   return { ok: true };
 }
 
+export function isLinearThreadPlaceholder(text) {
+  return /^\s*This thread is for an agent session with\b/i.test(String(text || ""));
+}
+
 /**
  * Parse a Linear webhook payload into a normalized AgentSessionEvent when applicable.
  */
@@ -80,10 +84,14 @@ export function parseAgentSessionEvent(payload) {
   const isStopSignal = Boolean(
     signal === "stop" || action === "stopped" || action === "cancelled"
   );
-  const promptBody =
-    [agentActivity?.body, agentActivity?.content?.body, session.comment?.body]
+  const activityBody =
+    [agentActivity?.body, agentActivity?.content?.body]
       .find((v) => typeof v === "string" && v.trim())
       ?.trim() || "";
+  const rawCommentBody =
+    typeof session.comment?.body === "string" ? session.comment.body.trim() : "";
+  const commentBody = isLinearThreadPlaceholder(rawCommentBody) ? "" : rawCommentBody;
+  const promptBody = activityBody || commentBody;
 
   return {
     type: payload.type || "AgentSessionEvent",

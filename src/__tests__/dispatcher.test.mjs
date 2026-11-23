@@ -696,7 +696,8 @@ test("EventDispatcher persists suggestedBranchName, includes it in initial thoug
       action: "prompted",
       agentSessionId: "ase-branch-1",
       issue: { id: "iss-branch-1", identifier: "ENG-101" },
-      comment: { body: "Run integration tests too" },
+      comment: { body: "This thread is for an agent session with antigravity." },
+      promptBody: "Run integration tests too",
       guidance: "Follow-up policy Y",
       promptContext: "",
     });
@@ -707,7 +708,9 @@ test("EventDispatcher persists suggestedBranchName, includes it in initial thoug
       resumes[0].prompt.includes("Suggested branch name: antigravity/eng-101-improve-throughput")
     );
     assert.ok(resumes[0].prompt.includes("## Linear Guidance\nFollow-up policy Y"));
-    assert.ok(resumes[0].prompt.includes("## Triggering Comment\nRun integration tests too"));
+    assert.ok(resumes[0].prompt.includes("Run integration tests too"));
+    assert.ok(!resumes[0].prompt.includes("This thread is for an agent session"));
+    assert.ok(!resumes[0].prompt.includes("## Linear Agent Session 接管与回写协议"));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

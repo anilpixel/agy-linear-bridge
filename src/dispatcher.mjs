@@ -192,8 +192,9 @@ export class EventDispatcher {
     const { agentSessionId } = event;
     const issueIdentifier = existing.issueIdentifier || event.issue?.identifier || "";
     const sessionCallback = this._buildSessionCallback(agentSessionId);
-    const comment =
-      event.comment || (event.promptBody ? { body: event.promptBody } : null);
+    const comment = event.promptBody
+      ? { body: event.promptBody }
+      : event.comment || null;
     const prompt = buildFollowUpPrompt({
       issueIdentifier,
       branchName: existing.suggestedBranchName || "",
@@ -258,7 +259,9 @@ export class EventDispatcher {
     const issueContext = await this._resolveIssueContext(event);
     const decision = await this.routeIssueFn({
       issueContext,
-      promptContext: [event.promptContext, event.comment?.body].filter(Boolean).join("\n\n"),
+      promptContext: [event.promptContext, event.promptBody, event.comment?.body]
+        .filter(Boolean)
+        .join("\n\n"),
       projectsConfig,
       routerConfig: this.config.router,
       agyBin: this.config.launcher.agyBin,
@@ -321,7 +324,9 @@ export class EventDispatcher {
     const sessionCallback = this._buildSessionCallback(agentSessionId);
     const prompt = buildDispatchPrompt({
       issueContext,
-      comment: event.comment || (event.promptBody ? { body: event.promptBody } : null),
+      comment: event.promptBody
+        ? { body: event.promptBody }
+        : event.comment || null,
       promptContext: event.promptContext,
       guidance: event.guidance,
       creator: event.creator,

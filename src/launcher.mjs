@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { isLinearThreadPlaceholder } from "./webhook.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,6 +53,16 @@ function buildSessionCallbackInstructions(sessionCallback) {
     `    -d '{"type":"thought","body":"已进入云端环境，开始排查代码"}'` ,
     "  ```",
     "- **职责区分**：上面的 Callback 用于更新 Linear **AgentSession 生命周期**（思考/动作/提问/最终 `response` 结单）；读取上下游工单依赖、更新工单状态（如 `In Progress` / `In Review`）或补充持久工单评论，仍请使用云端 `linear` CLI（`/home/antigravity/.gemini/bin/linear`）。",
+  ];
+}
+
+function buildCompactCallbackReminder(sessionCallback) {
+  if (!sessionCallback?.callbackUrl || !sessionCallback?.callbackToken) {
+    return [];
+  }
+  return [
+    "",
+    `> Callback（进度 \`thought\` / 最终结单 \`response\`）：\`POST ${sessionCallback.callbackUrl}\` · \`Authorization: Bearer ${sessionCallback.callbackToken}\``,
   ];
 }
 
@@ -156,7 +167,8 @@ export function buildDispatchPrompt({
   const triggerUser = String(creator?.displayName || creator?.name || "").trim();
   const rawPromptContext = String(promptContext || "").trim();
   const hasIssueXml = /<issue\b/i.test(rawPromptContext);
-  const commentBody = String(comment?.body || "").trim();
+  const rawCommentBody = String(comment?.body || "").trim();
+  const commentBody = isLinearThreadPlaceholder(rawCommentBody) ? "" : rawCommentBody;
   const guidanceText = formatGuidance(guidance);
   const workflowBody = String(workflow?.body || "").trim();
 
@@ -217,21 +229,19 @@ export function buildFollowUpPrompt({
   const cleanIdentifier = String(issueIdentifier || "").trim();
   const cleanBranch = String(branchName || "").trim();
   const rawPromptContext = String(promptContext || "").trim();
-  const commentBody = String(comment?.body || "").trim();
+  const rawCommentBody = String(comment?.body || "").trim();
+  const commentBody = isLinearThreadPlaceholder(rawCommentBody) ? "" : rawCommentBody;
   const guidanceText = formatGuidance(guidance);
 
   return [
     `Follow-up on Linear issue ${cleanIdentifier || "UNKNOWN-ISSUE"}:`,
     cleanBranch ? `Suggested branch name: ${cleanBranch}` : null,
-    "",
     commentBody && !isTextAlreadyIncluded(commentBody, rawPromptContext)
-      ? `## Triggering Comment\n${commentBody}`
+      ? `\n${commentBody}`
       : null,
-    rawPromptContext ? `\n## Linear Prompt Context\n${rawPromptContext}` : null,
+    rawPromptContext ? `\n${rawPromptContext}` : null,
     guidanceText ? `\n## Linear Guidance\n${guidanceText}` : null,
-    "",
-    `请结合当前会话上下文继续处理${cleanBranch ? `（涉及代码改动请继续使用分支 \`${cleanBranch}\`）` : ""}，并通过云端 \`linear\` CLI 或下方 AgentSession Callback 回写进展与最终 \`response\` 结单。`,
-    ...buildSessionCallbackInstructions(sessionCallback),
+    ...buildCompactCallbackReminder(sessionCallback),
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -282,10 +292,7 @@ export function buildGitHubFeedbackPrompt({
     ];
   }
 
-  lines.push(
-    "完成后请通过下方 AgentSession Callback 回写结果，并确保发送最终 `response` 结单。",
-    ...buildSessionCallbackInstructions(sessionCallback)
-  );
+  lines.push(...buildCompactCallbackReminder(sessionCallback));
 
   return lines.filter((line) => line !== null).join("\n");
 }

@@ -281,8 +281,9 @@ export class EdgeRunner {
 
     if (isFollowUp) {
       const issueIdentifier = existing.issueIdentifier || issueContext?.identifier || "";
-      const comment =
-        event.comment || (event.promptBody ? { body: event.promptBody } : null);
+      const comment = event.promptBody
+        ? { body: event.promptBody }
+        : event.comment || null;
       const prompt = buildFollowUpPrompt({
         issueIdentifier,
         branchName: existing.suggestedBranchName || "",
@@ -401,7 +402,9 @@ export class EdgeRunner {
     const suggestedBranchName = String(issueContext?.branchName || "").trim() || null;
     const prompt = buildDispatchPrompt({
       issueContext,
-      comment: event.comment || (event.promptBody ? { body: event.promptBody } : null),
+      comment: event.promptBody
+        ? { body: event.promptBody }
+        : event.comment || null,
       promptContext: event.promptContext,
       guidance: event.guidance,
       creator: event.creator,
