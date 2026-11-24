@@ -2,6 +2,10 @@
 
 Bridge Linear native **Agent Sessions** (`@mention` or issue assignment with `actor=app`) directly to isolated **Antigravity Remote Agents** (`agy --remote-agent`) running in cloud ACE uVMs.
 
+<p align="center">
+  <img src="docs/demo.gif" alt="agy-linear-bridge end-to-end demo: Linear @Antigravity to Cloudflare Edge, Outbound Runner, Antigravity Cloud ACE uVM, and PR attachment" width="100%" />
+</p>
+
 > [!NOTE]
 > **Unofficial Community Bridge**: `agy-linear-bridge` is an independent integration built on Linear's `AgentSessionEvent` webhook/GraphQL API and the `agy` CLI (tested with `agy 1.5.15`, Node.js `v24`, Python `3.13+`). Because `agy` headless remote triggers rely on PTY automation and TUI stream parsing, future upstream CLI UI changes may require minor regex updates.
 
